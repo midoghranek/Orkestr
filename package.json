@@ -1,0 +1,56 @@
+{
+  "name": "orkestr",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Orkestr: local-first AI creative production studio",
+  "type": "module",
+  "engines": {
+    "node": ">=22.13"
+  },
+  "scripts": {
+    "dev": "concurrently -k -n web,worker -c cyan,magenta \"next dev -H 127.0.0.1 -p 4317\" \"tsx watch --clear-screen=false worker/index.ts\"",
+    "build": "next build",
+    "start": "concurrently -k -n web,worker -c cyan,magenta \"next start -H 127.0.0.1 -p 4317\" \"tsx worker/index.ts\"",
+    "worker": "tsx worker/index.ts",
+    "discover": "tsx scripts/discover.ts",
+    "seed:kafeeh": "tsx scripts/seed-kafeeh.ts",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:e2e": "playwright test",
+    "remotion:studio": "remotion studio remotion/index.ts"
+  },
+  "dependencies": {
+    "@dagrejs/dagre": "3.1.3",
+    "@remotion/bundler": "4.0.545",
+    "@remotion/captions": "^4.0.545",
+    "@remotion/cli": "4.0.545",
+    "@remotion/install-whisper-cpp": "^4.0.545",
+    "@remotion/renderer": "4.0.545",
+    "@xyflow/react": "13.0.2",
+    "clsx": "2.1.1",
+    "lucide-react": "1.77.0",
+    "next": "16.4.6",
+    "playwright": "1.65.1",
+    "react": "19.3.1",
+    "react-dom": "19.3.1",
+    "remotion": "4.0.545",
+    "tailwind-merge": "3.7.1",
+    "tsx": "4.23.15",
+    "zod": "4.6.7"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.65.1",
+    "@tailwindcss/postcss": "4.3.5",
+    "@types/node": "24.19.2",
+    "@types/react": "19.3.0",
+    "@types/react-dom": "19.3.0",
+    "concurrently": "10.0.7",
+    "tailwindcss": "4.3.5",
+    "typescript": "5.9.3",
+    "vitest": "5.1.1"
+  },
+  "allowScripts": {
+    "esbuild@0.28.1": true
+  }
+}
