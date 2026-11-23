@@ -29,7 +29,7 @@ describe("path security", () => {
 
   it("sanitises file names", () => {
     expect(safeFileName("../../evil name?.mp4")).toBe("evil-name-.mp4");
-    expect(safeFileName("كافيه-ad")).toBe("كافيه-ad");
+    expect(safeFileName("قهوة-ad")).toBe("قهوة-ad");
   });
 
   it("only imports from allowed roots", async () => {

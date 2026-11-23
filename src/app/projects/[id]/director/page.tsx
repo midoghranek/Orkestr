@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { Sparkles } from "lucide-react";
 import { ago, api, assetUrl, fmtUsd, useApi } from "@/lib/api";
-import { Button, Card, CardHeader, Empty, ErrorNote, Field, Notice, Pill, Progress, Select, StatusBadge, Textarea, toast, cn } from "@/components/ui";
+import { Button, Card, CardHeader, Empty, ErrorNote, Field, Input, LoadingRows, Notice, Pill, Progress, Select, Skeleton, StatusBadge, Textarea, toast, cn } from "@/components/ui";
 import { useProject, type AssetFull } from "@/components/project-context";
 
 interface Plan {
@@ -62,87 +62,122 @@ export default function DirectorPage() {
     }
   };
 
-  if (!data) return <div className="p-6 text-xs text-faint">Loading…</div>;
-  return (
-    <div className="grid gap-4 p-6 xl:grid-cols-[380px_1fr]">
-      <div className="space-y-4">
+  if (!data)
+    return (
+      <div className="grid gap-6 p-4 sm:p-6 lg:p-8 xl:grid-cols-[400px_1fr]">
         <Card>
-          <CardHeader title="Brief" sub="Describe the goal. The Director plans only with verified tools and the project's verified claims." />
+          <LoadingRows rows={4} />
+        </Card>
+        <Skeleton className="h-64" />
+      </div>
+    );
+  return (
+    <div className="grid gap-6 p-4 sm:p-6 lg:p-8 xl:grid-cols-[400px_minmax(0,1fr)]">
+      <div className="min-w-0 space-y-6">
+        <Card>
+          <CardHeader eyebrow="Step 1" title="Brief" sub="Describe the goal. The Director plans only with verified tools and the project's verified claims." />
           <div className="space-y-3 p-4">
-            <Textarea dir="auto" value={brief} onChange={(e) => setBrief(e.target.value)} className="min-h-48" placeholder="What are we making, for whom, in which language and formats?" />
-            <div className="flex items-center justify-between gap-2">
-              <span className="text-[11px] text-faint">Model call billed to your Claude plan; cost recorded after the call.</span>
-              <Button variant="primary" busy={busy} disabled={brief.trim().length < 10} onClick={submit}>
+            <Textarea dir="auto" value={brief} onChange={(e) => setBrief(e.target.value)} className="min-h-56 text-[15px] leading-relaxed sm:min-h-64" placeholder="What are we making, for whom, in which language and formats?" aria-label="Brief" />
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <span className="min-w-0 flex-1 basis-48 text-[12px] leading-snug text-faint">Model call billed to your Claude plan; cost recorded after the call.</span>
+              <Button variant="primary" size="lg" busy={busy} disabled={brief.trim().length < 10} onClick={submit}>
                 <Sparkles className="size-4" /> Plan
               </Button>
             </div>
           </div>
         </Card>
         <Card>
-          <CardHeader title="Plans" />
-          <div className="divide-y divide-line">
-            {plans.data?.length ? (
-              plans.data.map((p) => (
-                <button key={p.id} onClick={() => setSelected(p.id)} className={cn("block w-full px-4 py-2.5 text-left hover:bg-panel-2/50", current?.id === p.id && "bg-panel-2")}>
-                  <div className="flex items-center gap-2">
-                    <span className="min-w-0 flex-1 truncate text-[13px]">{p.plan?.title ?? p.brief.slice(0, 60)}</span>
-                    <StatusBadge status={p.status} />
-                  </div>
-                  <div className="mt-0.5 text-[11px] text-faint">
-                    {ago(p.created_at)}
-                    {p.cost_usd !== null && ` · ${fmtUsd(p.cost_usd)}`}
-                    {p.model && ` · ${p.model}`}
-                  </div>
-                  {(p.status === "running" || p.status === "queued") && <Progress className="mt-1.5" indeterminate />}
-                </button>
-              ))
-            ) : (
-              <div className="px-4 py-5 text-center text-xs text-muted">No plans yet.</div>
-            )}
-          </div>
+          <CardHeader eyebrow="History" title="Plans" />
+          {!plans.data && plans.loading ? (
+            <LoadingRows rows={2} />
+          ) : plans.data?.length ? (
+            <div className="space-y-2 p-3">
+              {plans.data.map((p) => {
+                const on = current?.id === p.id;
+                return (
+                  <button
+                    key={p.id}
+                    type="button"
+                    onClick={() => setSelected(p.id)}
+                    aria-pressed={on}
+                    aria-current={on ? "true" : undefined}
+                    className={cn("nb-press block min-h-11 w-full rounded-ctl border-2 border-ink px-3 py-2.5 text-left", on ? "bg-accent shadow-brut-sm" : "bg-panel shadow-brut-xs hover:bg-white")}
+                  >
+                    <div className="flex items-center gap-2">
+                      <span className="min-w-0 flex-1 truncate text-[14px] font-semibold text-ink" dir="auto">
+                        {p.plan?.title ?? p.brief.slice(0, 60)}
+                      </span>
+                      <StatusBadge status={p.status} />
+                    </div>
+                    <div className="mt-1 font-mono text-[12px] text-ink/75">
+                      {ago(p.created_at)}
+                      {p.cost_usd !== null && ` · ${fmtUsd(p.cost_usd)}`}
+                      {p.model && ` · ${p.model}`}
+                    </div>
+                    {(p.status === "running" || p.status === "queued") && <Progress className="mt-2" indeterminate />}
+                  </button>
+                );
+              })}
+            </div>
+          ) : (
+            <div className="px-4 py-6 text-center text-[13px] text-muted">No plans yet.</div>
+          )}
         </Card>
       </div>
-      <div>{current ? <PlanView row={current} /> : <Empty title="No plan selected">Write a brief and press Plan.</Empty>}</div>
+      <div className="min-w-0">{current ? <PlanView row={current} /> : <Empty title="No plan selected" icon={<Sparkles className="size-5" />}>Write a brief and press Plan.</Empty>}</div>
     </div>
   );
 }
 
 function PlanView({ row }: { row: PlanRow }) {
   if (row.status === "failed") return <ErrorNote>The AI Director failed: {row.error}</ErrorNote>;
+  if (!row.plan && row.status === "completed") return <ErrorNote>This plan finished but its saved result could not be read (it does not match the current plan schema). Plan again to get a fresh one.</ErrorNote>;
   if (!row.plan)
     return (
-      <Card className="p-6">
-        <div className="text-sm">Planning…</div>
-        <Progress className="mt-3" indeterminate />
-        <div className="mt-2 text-xs text-muted">You can keep working; this page updates when the plan is ready.</div>
+      <Card className="p-5 sm:p-6">
+        <div className="font-display text-[18px] font-bold text-ink">Planning…</div>
+        <Progress className="mt-4" indeterminate label="The AI Director is planning" />
+        <p className="mt-3 text-[13px] leading-relaxed text-muted">The Director runs in the worker and usually takes 1–3 minutes. You can keep working; this page updates when the plan is ready.</p>
       </Card>
     );
   const p = row.plan;
   const total = p.scenes.reduce((s, x) => s + x.durationS, 0);
   return (
-    <div className="space-y-4">
+    <div className="space-y-6">
       <Card>
-        <CardHeader title={p.title} sub={p.logline} />
-        <div className="grid gap-3 p-4 text-xs md:grid-cols-4">
+        <div className="nb-clapper h-3 rounded-t-[10px] border-b-2 border-ink" aria-hidden />
+        <div className="space-y-2 border-b-2 border-ink px-4 py-5 sm:px-6">
+          <div className="nb-label text-faint">Call sheet</div>
+          <h2 className="font-display text-[26px] font-extrabold leading-[1.05] tracking-[-0.03em] text-ink sm:text-[34px]" dir="auto">
+            {p.title}
+          </h2>
+          <p className="max-w-[70ch] text-[15px] leading-relaxed text-muted" dir="auto">
+            {p.logline}
+          </p>
+        </div>
+        <dl className="grid grid-cols-2 gap-x-4 gap-y-4 border-b-2 border-ink px-4 py-4 sm:px-6 md:grid-cols-4">
           <Meta k="Language" v={p.language} />
           <Meta k="Audience" v={p.audience} />
           <Meta k="Tone" v={p.tone} />
-          <Meta k="Scenes" v={`${p.scenes.length} · ${total.toFixed(1)}s`} />
-        </div>
-        <div className="flex flex-wrap gap-2 px-4 pb-4">
-          {p.deliverables.map((d) => (
-            <Pill key={d.name}>
-              {d.name} · {d.aspect} · {d.durationS}s
-            </Pill>
-          ))}
+          <Meta k="Scenes" v={`${p.scenes.length} · ${total.toFixed(1)}s`} mono />
+        </dl>
+        <div className="px-4 py-4 sm:px-6">
+          <div className="nb-label mb-2 text-faint">Deliverables</div>
+          <div className="flex flex-wrap gap-2">
+            {p.deliverables.map((d) => (
+              <Pill key={d.name} tone="accent">
+                {d.name} · {d.aspect} · {d.durationS}s
+              </Pill>
+            ))}
+          </div>
         </div>
       </Card>
       {(p.questions.length > 0 || p.risks.length > 0) && (
-        <div className="grid gap-3 md:grid-cols-2">
+        <div className="grid gap-4 md:grid-cols-2">
           {p.questions.length > 0 && (
             <Notice tone="info">
               <div className="mb-1 font-semibold">Questions from the Director</div>
-              <ul className="list-disc space-y-0.5 pl-4" dir="auto">
+              <ul className="list-disc space-y-1 pl-4" dir="auto">
                 {p.questions.map((q) => (
                   <li key={q}>{q}</li>
                 ))}
@@ -152,7 +187,7 @@ function PlanView({ row }: { row: PlanRow }) {
           {p.risks.length > 0 && (
             <Notice tone="warn">
               <div className="mb-1 font-semibold">Risks & limits</div>
-              <ul className="list-disc space-y-0.5 pl-4" dir="auto">
+              <ul className="list-disc space-y-1 pl-4" dir="auto">
                 {p.risks.map((q) => (
                   <li key={q}>{q}</li>
                 ))}
@@ -162,59 +197,67 @@ function PlanView({ row }: { row: PlanRow }) {
         </div>
       )}
       <Card>
-        <CardHeader title="Script" sub={p.voiceover.needed ? `Voiceover: ${p.voiceover.language} — ${p.voiceover.direction}` : "No voiceover"} />
-        <div className="whitespace-pre-wrap p-4 text-[14px] leading-loose" dir="auto">
+        <CardHeader eyebrow="Reading copy" title="Script" sub={p.voiceover.needed ? `Voiceover: ${p.voiceover.language} — ${p.voiceover.direction}` : "No voiceover"} />
+        <div className="whitespace-pre-wrap px-4 py-5 text-[15px] leading-[1.8] text-ink sm:px-6 sm:text-[16px] md:max-w-[70ch]" dir="auto">
           {p.script}
         </div>
       </Card>
       <Card>
-        <CardHeader title="Storyboard & shot list" />
-        <div className="divide-y divide-line">
-          {p.scenes.map((s, i) => (
-            <div key={i} className="grid gap-2 px-4 py-3 md:grid-cols-[48px_1fr_1fr]">
-              <div className="text-xs text-faint">
-                #{i + 1}
-                <div>{s.durationS}s</div>
-              </div>
-              <div>
-                <div className="flex items-center gap-2">
-                  <span className="text-[13px] font-medium">{s.title}</span>
-                  <Pill tone={UNPRODUCIBLE.includes(s.visualSource) ? "warn" : "default"} title={UNPRODUCIBLE.includes(s.visualSource) ? "No verified tool can produce this; it will use a marked placeholder" : undefined}>
-                    {s.visualSource}
-                  </Pill>
+        <CardHeader eyebrow={`${p.scenes.length} scenes · ${total.toFixed(1)}s`} title="Storyboard & shot list" />
+        <ol className="divide-y-2 divide-ink">
+          {p.scenes.map((s, i) => {
+            const unprod = UNPRODUCIBLE.includes(s.visualSource);
+            return (
+              <li key={i} className="grid gap-x-4 gap-y-3 px-4 py-4 sm:px-6 md:grid-cols-[64px_minmax(0,1fr)_minmax(0,1fr)]">
+                <div className="flex items-center gap-3 md:flex-col md:items-start md:gap-1.5">
+                  <span className="inline-flex size-12 items-center justify-center rounded-ctl border-2 border-ink bg-accent font-mono text-[20px] font-bold text-ink shadow-brut-xs">{String(i + 1).padStart(2, "0")}</span>
+                  <span className="font-mono text-[13px] font-semibold text-ink">{s.durationS}s</span>
                 </div>
-                {s.onScreenText && (
-                  <div className="mt-1 text-xs text-accent" dir="auto">
-                    {s.onScreenText}
+                <div className="min-w-0 space-y-2">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="font-display text-[16px] font-bold leading-tight text-ink" dir="auto">
+                      {s.title}
+                    </span>
+                    <Pill tone={unprod ? "warn" : "default"} title={unprod ? "No verified tool can produce this; it will use a marked placeholder" : undefined}>
+                      {s.visualSource}
+                    </Pill>
                   </div>
-                )}
-                {s.narration && (
-                  <div className="mt-1 text-xs text-fg/90" dir="auto">
-                    “{s.narration}”
-                  </div>
-                )}
-              </div>
-              <div className="text-[11px] leading-relaxed text-muted">
-                {s.prompt && <div>{s.prompt}</div>}
-                {s.camera && <div className="mt-1 text-faint">Camera: {s.camera}</div>}
-                {s.constraints.length > 0 && <div className="mt-1 text-faint">Constraints: {s.constraints.join("; ")}</div>}
-              </div>
-            </div>
-          ))}
-        </div>
+                  {s.onScreenText && (
+                    <div>
+                      <div className="nb-label mb-1 text-faint">On-screen text</div>
+                      <div className="inline-block max-w-full break-words rounded-ctl border-2 border-ink bg-accent px-2.5 py-1 text-[14px] font-semibold leading-snug text-ink" dir="auto">
+                        {s.onScreenText}
+                      </div>
+                    </div>
+                  )}
+                  {s.narration && (
+                    <div className="border-s-4 border-ink ps-3 text-[14px] italic leading-relaxed text-ink" dir="auto">
+                      “{s.narration}”
+                    </div>
+                  )}
+                </div>
+                <div className="min-w-0 space-y-1.5 text-[13px] leading-relaxed text-muted">
+                  {s.prompt && <div dir="auto">{s.prompt}</div>}
+                  {s.camera && <div className="text-faint">Camera: {s.camera}</div>}
+                  {s.constraints.length > 0 && <div className="text-faint">Constraints: {s.constraints.join("; ")}</div>}
+                </div>
+              </li>
+            );
+          })}
+        </ol>
       </Card>
       <AcceptPanel row={row} />
     </div>
   );
 }
 
-function Meta({ k, v }: { k: string; v: string }) {
+function Meta({ k, v, mono }: { k: string; v: string; mono?: boolean }) {
   return (
-    <div>
-      <div className="text-faint">{k}</div>
-      <div className="mt-0.5 text-muted" dir="auto">
+    <div className="min-w-0">
+      <dt className="nb-label text-faint">{k}</dt>
+      <dd className={cn("mt-1 break-words text-[14px] font-semibold leading-snug text-ink", mono && "font-mono")} dir="auto">
         {v}
-      </div>
+      </dd>
     </div>
   );
 }
@@ -268,23 +311,35 @@ function AcceptPanel({ row }: { row: PlanRow }) {
   const opts = (list: AssetFull[]) => [{ value: "", label: "— none —" }, ...list.map((a) => ({ value: a.id, label: `${a.label} (${a.kind}${a.width ? ` ${a.width}×${a.height}` : ""})` }))];
   return (
     <Card>
-      <CardHeader title="Accept plan → storyboard + workflow" sub="Orkestr builds the graph deterministically from the plan. Nothing runs until you press Run in the flow editor." />
-      <div className="space-y-4 p-4">
-        <Field label={`Visual pool (${pool.length} selected)`} hint="Brand photos/videos used for non-UI scenes, in order. UI scenes are captured live from the product URL.">
-          <div className="grid max-h-56 grid-cols-4 gap-2 overflow-y-auto rounded border border-line p-2 md:grid-cols-6">
+      <CardHeader eyebrow="Final step" title="Accept plan → storyboard + workflow" sub="Orkestr builds the graph deterministically from the plan. Nothing runs until you press Run in the flow editor." />
+      <div className="space-y-5 p-4 sm:p-5">
+        <div role="group" aria-label={`Visual pool (${pool.length} selected)`}>
+          <span className="nb-label mb-1.5 block text-muted">{`Visual pool (${pool.length} selected)`}</span>
+          <div className="grid max-h-72 grid-cols-3 gap-2.5 overflow-y-auto rounded-ctl border-2 border-ink bg-panel-2 p-2.5 sm:grid-cols-4 md:grid-cols-6">
             {images.map((a) => {
               const on = pool.includes(a.id);
               return (
-                <button key={a.id} onClick={() => setPool(on ? pool.filter((x) => x !== a.id) : [...pool, a.id])} className={cn("relative aspect-video overflow-hidden rounded border", on ? "border-accent ring-1 ring-accent" : "border-line opacity-70 hover:opacity-100")} title={a.label}>
+                <button
+                  key={a.id}
+                  type="button"
+                  aria-pressed={on}
+                  onClick={(e) => {
+                    e.preventDefault();
+                    setPool(on ? pool.filter((x) => x !== a.id) : [...pool, a.id]);
+                  }}
+                  className={cn("relative aspect-video overflow-hidden rounded-ctl border-2 bg-panel", on ? "border-ink shadow-brut-accent ring-2 ring-ink" : "border-ink/60 opacity-75 hover:border-ink hover:opacity-100")}
+                  title={a.label}
+                >
                   {a.kind === "image" ? <img src={assetUrl(a.id)} alt="" className="h-full w-full object-cover" /> : <video src={assetUrl(a.id)} muted className="h-full w-full object-cover" />}
-                  {on && <span className="absolute left-1 top-1 rounded bg-accent px-1 text-[10px] font-bold text-accent-fg">{pool.indexOf(a.id) + 1}</span>}
+                  {on && <span className="absolute left-1 top-1 inline-flex min-w-6 items-center justify-center rounded-sm border-2 border-ink bg-accent px-1 font-mono text-[12px] font-bold leading-5 text-ink">{pool.indexOf(a.id) + 1}</span>}
                 </button>
               );
             })}
-            {!images.length && <div className="col-span-full p-3 text-center text-xs text-muted">Upload brand visuals in the Assets tab first.</div>}
+            {!images.length && <div className="col-span-full p-3 text-center text-[13px] text-muted">Upload brand visuals in the Assets tab first.</div>}
           </div>
-        </Field>
-        <div className="grid gap-3 md:grid-cols-3">
+          <span className="mt-1.5 block text-[12px] leading-snug text-faint">Brand photos/videos used for non-UI scenes, in order. UI scenes are captured live from the product URL.</span>
+        </div>
+        <div className="grid gap-4 md:grid-cols-3">
           <Field label="Logo (light bg)">
             <Select value={logo} onChange={(e) => setLogo(e.target.value)} options={opts(images.filter((a) => a.kind === "image"))} />
           </Field>
@@ -295,7 +350,7 @@ function AcceptPanel({ row }: { row: PlanRow }) {
             <Select value={music} onChange={(e) => setMusic(e.target.value)} options={opts(audio)} />
           </Field>
         </div>
-        <div className="grid gap-3 md:grid-cols-3">
+        <div className="grid gap-4 md:grid-cols-3">
           <Field label="Voiceover" hint={!elevenReady ? "ElevenLabs is not configured (Settings → Credentials)." : "Paid; you approve before anything is spent."}>
             <Select
               value={vo}
@@ -314,12 +369,12 @@ function AcceptPanel({ row }: { row: PlanRow }) {
           )}
           {vo === "elevenlabs" && (
             <Field label="ElevenLabs voice id">
-              <input className="h-8 w-full rounded-md border border-line bg-bg px-2.5 text-[13px]" value={voiceId} onChange={(e) => setVoiceId(e.target.value)} />
+              <Input className="font-mono text-[13px]" value={voiceId} onChange={(e) => setVoiceId(e.target.value)} />
             </Field>
           )}
         </div>
         <div className="flex justify-end">
-          <Button variant="primary" busy={busy} onClick={accept} disabled={(vo === "asset" && !voAsset) || (vo === "elevenlabs" && !voiceId)}>
+          <Button variant="primary" size="lg" busy={busy} onClick={accept} disabled={(vo === "asset" && !voAsset) || (vo === "elevenlabs" && !voiceId)}>
             Accept plan
           </Button>
         </div>

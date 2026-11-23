@@ -92,7 +92,7 @@ export class ElevenLabsAdapter implements ToolAdapter {
         cost: { model: "unknown", note: "Charged per character against your ElevenLabs plan; USD/character depends on the plan. Orkestr reports the exact character count." },
         verifiedBy: "REST contract from the official API reference; health check calls GET /v1/user/subscription (no spend)",
         requires: ["ElevenLabs API key"],
-        limitations: ["Egyptian Arabic pronunciation must be verified by listening; brand name «كافيه» may need a phonetic respelling"],
+        limitations: ["Egyptian Arabic pronunciation must be verified by listening; the brand name may need a phonetic respelling"],
       },
       {
         id: "elevenlabs.voices",

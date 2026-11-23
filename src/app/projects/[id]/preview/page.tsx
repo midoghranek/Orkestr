@@ -3,7 +3,8 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { assetUrl, ago, fmtBytes, useApi } from "@/lib/api";
 import { useProject, type AssetFull } from "@/components/project-context";
-import { Card, CardHeader, Empty, ErrorNote, Pill, Select, Spinner, cn } from "@/components/ui";
+import { Check, Download } from "lucide-react";
+import { Card, CardHeader, Empty, ErrorNote, Label, LoadingRows, Pill, Select, Skeleton, Spinner, btnCls, cn } from "@/components/ui";
 
 interface Cue {
   start: number;
@@ -84,34 +85,34 @@ function QaReport({ asset }: { asset: AssetFull }) {
   const checks = j?.checks ?? [];
   const overall = j?.pass ?? j?.passed ?? (checks.length ? checks.every((c) => (c.pass ?? c.passed) !== false) : undefined);
   return (
-    <div className="space-y-2 rounded-md border border-line p-3">
-      <div className="flex items-center gap-2 text-xs">
-        <span className="font-medium">{asset.label}</span>
-        <span className="text-faint">{ago(asset.createdAt)}</span>
-        {overall !== undefined && <Pill tone={overall ? "ok" : "err"}>{overall ? "pass" : "fail"}</Pill>}
+    <div className="space-y-2 rounded-ctl border-2 border-ink bg-panel p-3">
+      <div className="flex flex-wrap items-center gap-2 text-[13px]">
+        <span className="min-w-0 truncate font-semibold" title={asset.label}>{asset.label}</span>
+        <span className="text-[12px] text-faint">{ago(asset.createdAt)}</span>
+        {overall !== undefined && <Pill tone={overall ? "ok" : "err"} className="font-mono uppercase">{overall ? "✓ pass" : "✕ fail"}</Pill>}
         {loading && <Spinner className="size-3" />}
       </div>
       {(error || parseErr) && <ErrorNote>{error ?? parseErr}</ErrorNote>}
       {j?.facts && (
-        <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs sm:grid-cols-3">
+        <div className="grid grid-cols-1 gap-x-4 gap-y-1 text-[13px] min-[480px]:grid-cols-2">
           {Object.entries(j.facts).map(([k, v]) => (
             <div key={k} className="min-w-0">
-              <span className="text-faint">{k}: </span>
-              <span className="break-all text-fg">{show(v)}</span>
+              <span className="nb-label text-faint">{k}: </span>
+              <span className="break-all font-mono text-[12px] text-ink">{show(v)}</span>
             </div>
           ))}
         </div>
       )}
       {checks.length > 0 && (
         <div className="overflow-x-auto">
-          <table className="w-full text-left text-xs">
-            <thead className="text-faint">
+          <table className="w-full text-left text-[13px]">
+            <thead className="nb-label text-faint">
               <tr>
-                <th className="py-1 pr-3 font-medium">Check</th>
-                <th className="py-1 pr-3 font-medium">Expected</th>
-                <th className="py-1 pr-3 font-medium">Actual</th>
-                <th className="py-1 pr-3 font-medium">Severity</th>
-                <th className="py-1 font-medium">Result</th>
+                <th className="py-1 pr-3 font-semibold">Check</th>
+                <th className="py-1 pr-3 font-semibold">Expected</th>
+                <th className="py-1 pr-3 font-semibold">Actual</th>
+                <th className="py-1 pr-3 font-semibold">Severity</th>
+                <th className="py-1 font-semibold">Result</th>
               </tr>
             </thead>
             <tbody>
@@ -119,14 +120,14 @@ function QaReport({ asset }: { asset: AssetFull }) {
                 const ok = c.pass ?? c.passed;
                 return (
                   <tr key={i} className="border-t border-line">
-                    <td className="py-1 pr-3 text-fg">{c.name ?? "-"}</td>
+                    <td className="py-1 pr-3 text-ink">{c.name ?? "-"}</td>
                     <td className="py-1 pr-3 text-muted">{show(c.expected)}</td>
                     <td className="py-1 pr-3 text-muted">{show(c.actual)}</td>
                     <td className="py-1 pr-3">
                       <Pill tone={c.severity === "error" ? "err" : c.severity === "warn" || c.severity === "warning" ? "warn" : "default"}>{c.severity ?? "-"}</Pill>
                     </td>
                     <td className="py-1">
-                      <Pill tone={ok ? "ok" : "err"}>{ok ? "pass" : "fail"}</Pill>
+                      <Pill tone={ok ? "ok" : "err"} className="font-mono uppercase">{ok ? "✓ pass" : "✕ fail"}</Pill>
                     </td>
                   </tr>
                 );
@@ -177,22 +178,24 @@ export default function PreviewPage() {
 
   if (!data)
     return (
-      <div className="p-6">
-        <Spinner />
+      <div className="space-y-6 p-4 sm:p-6 lg:p-8" role="status" aria-label="loading">
+        <Skeleton className="h-96" />
+        <Skeleton className="h-40" />
       </div>
     );
 
   return (
-    <div className="grid gap-5 p-6 xl:grid-cols-[minmax(0,1fr)_380px]">
-      <div className="min-w-0 space-y-5">
+    <div className="grid gap-6 p-4 sm:p-6 lg:p-8 xl:grid-cols-[minmax(0,1fr)_380px]">
+      <div className="min-w-0 space-y-6">
         <Card>
           <CardHeader
             title="Production preview"
             sub={video ? `${video.label} · ${video.width ?? "?"}×${video.height ?? "?"} · ${fmtBytes(video.size)}` : undefined}
             actions={
               videos.length > 0 && (
-                <div className="w-64">
+                <div className="w-full sm:w-64">
                   <Select
+                    aria-label="Video asset"
                     value={activeVideoId ?? ""}
                     onChange={(e) => setVideoId(e.target.value)}
                     options={videos.map((v) => ({ value: v.id, label: `${v.label} (${ago(v.createdAt)})` }))}
@@ -206,7 +209,7 @@ export default function PreviewPage() {
               <Empty title="No video assets yet">Run a workflow that composes a video, or upload one in the Assets tab.</Empty>
             ) : (
               <>
-                <div className="relative mx-auto max-h-[65vh] overflow-hidden rounded-md bg-black">
+                <div className="relative mx-auto max-h-[65vh] overflow-hidden rounded-ctl border-2 border-ink bg-ink">
                   <video
                     key={video.id}
                     ref={videoRef}
@@ -214,56 +217,67 @@ export default function PreviewPage() {
                     controls
                     playsInline
                     preload="metadata"
-                    className="mx-auto max-h-[65vh] w-full bg-black object-contain"
+                    className="mx-auto max-h-[65vh] w-full bg-ink object-contain"
                     onTimeUpdate={(e) => setNow(e.currentTarget.currentTime)}
                     onSeeked={(e) => setNow(e.currentTarget.currentTime)}
                     onLoadedMetadata={(e) => setDur(e.currentTarget.duration)}
                   />
                   {activeCue && (
                     <div className="pointer-events-none absolute inset-x-0 bottom-12 flex justify-center px-4">
-                      <span dir="auto" className="max-w-[90%] whitespace-pre-line rounded-lg bg-black/75 px-3 py-1.5 text-center text-sm leading-snug text-white">
+                      <span dir="auto" className="max-w-[90%] whitespace-pre-line rounded-ctl bg-ink/85 px-3 py-1.5 text-center text-sm leading-snug text-cream">
                         {activeCue.text}
                       </span>
                     </div>
                   )}
                 </div>
-                <div className="flex flex-wrap items-center gap-2 text-xs">
-                  <Pill>duration {dur ? tc(dur) : video.durationS ? tc(video.durationS) : "-"}</Pill>
-                  <Pill tone="info">current {tc(now)}</Pill>
-                  {video.fps != null && <Pill>{video.fps} fps</Pill>}
-                  {sceneTotal > 0 && <Pill>storyboard {tc(sceneTotal)}</Pill>}
+                <div className="flex flex-wrap items-center gap-2 font-mono">
+                  <Pill className="font-mono">duration {dur ? tc(dur) : video.durationS ? tc(video.durationS) : "-"}</Pill>
+                  <Pill tone="info" className="font-mono">current {tc(now)}</Pill>
+                  {video.fps != null && <Pill className="font-mono">{video.fps} fps</Pill>}
+                  {sceneTotal > 0 && <Pill className="font-mono">storyboard {tc(sceneTotal)}</Pill>}
                 </div>
               </>
             )}
 
             {scenes.length > 0 && (
               <div>
-                <div className="mb-1 text-[11px] font-medium uppercase tracking-wide text-faint">Scene timeline</div>
-                <div className="relative flex h-9 overflow-hidden rounded-md border border-line bg-bg">
+                <Label className="mb-1.5 block">Scene timeline</Label>
+                <div className="relative flex h-12 overflow-hidden rounded-ctl border-2 border-ink bg-panel">
                   {(() => {
                     let acc = 0;
-                    return scenes.map((s) => {
+                    return scenes.map((s, i) => {
                       const start = acc;
                       acc += s.durationS;
+                      const current = !!video && now >= start && now < start + s.durationS;
                       return (
                         <button
                           key={s.id}
+                          type="button"
                           disabled={!video}
+                          aria-pressed={current}
                           onClick={() => seek(start)}
-                          title={`${s.idx + 1}. ${s.title} (${tc(start)} - ${tc(start + s.durationS)})`}
+                          title={`${s.idx + 1}. ${s.title} (${tc(start)} - ${tc(start + s.durationS)})${s.status === "approved" ? " - approved" : ""}`}
                           style={{ width: `${(s.durationS / sceneTotal) * 100}%` }}
-                          className={cn("min-w-0 truncate border-r border-line px-1.5 text-left text-[11px] text-muted last:border-r-0 hover:bg-panel-2 hover:text-fg disabled:cursor-not-allowed", s.status === "approved" && "bg-ok/10")}
+                          className={cn(
+                            "flex min-w-6 flex-col justify-center overflow-hidden border-ink px-1.5 text-left text-ink disabled:cursor-not-allowed",
+                            i < scenes.length - 1 && "border-r-2",
+                            current ? "bg-accent" : s.status === "approved" ? "bg-ok-fill hover:bg-accent/60" : "bg-panel hover:bg-panel-2",
+                          )}
                         >
-                          <span dir="auto">
-                            {s.idx + 1}. {s.title}
+                          <span className="flex items-center gap-1 font-mono text-[12px] font-bold leading-none">
+                            {s.idx + 1}
+                            {s.status === "approved" && <Check className="size-3" aria-label="approved" />}
+                          </span>
+                          <span dir="auto" className="mt-0.5 hidden truncate text-[12px] leading-none sm:block">
+                            {s.title}
                           </span>
                         </button>
                       );
                     });
                   })()}
-                  {video && sceneTotal > 0 && <div className="pointer-events-none absolute inset-y-0 w-0.5 bg-accent" style={{ left: `${Math.min(100, (now / (dur || sceneTotal)) * 100)}%` }} />}
+                  {video && sceneTotal > 0 && <div className="pointer-events-none absolute inset-y-0 w-1 -translate-x-1/2 bg-ink" style={{ left: `${Math.min(100, (now / (dur || sceneTotal)) * 100)}%` }} />}
                 </div>
-                <div className="mt-1 text-[11px] text-faint">Click a segment to seek to that scene&apos;s start. Segments are proportional to storyboard durations; the playhead is positioned against the video duration.</div>
+                <div className="mt-1.5 text-[12px] leading-snug text-faint">Click a segment to seek to that scene&apos;s start. Segments are proportional to storyboard durations; the ink playhead is positioned against the video duration. Approved scenes are green with a check.</div>
               </div>
             )}
           </div>
@@ -275,8 +289,9 @@ export default function PreviewPage() {
             sub={cues.length ? `${cues.length} cues` : undefined}
             actions={
               subs.length > 0 && (
-                <div className="w-64">
+                <div className="w-full sm:w-64">
                   <Select
+                    aria-label="Subtitle asset"
                     value={subId === "" ? (subs[0]?.id ?? "none") : subId}
                     onChange={(e) => setSubId(e.target.value)}
                     options={[{ value: "none", label: "No subtitles" }, ...subs.map((s) => ({ value: s.id, label: `${s.label} (${ago(s.createdAt)})` }))]}
@@ -287,23 +302,23 @@ export default function PreviewPage() {
           />
           <div className="p-4">
             {!subs.length && <Empty title="No subtitle assets">Subtitle (SRT) assets produced by a workflow will be listed here.</Empty>}
-            {srtLoading && <Spinner />}
+            {srtLoading && <LoadingRows rows={2} className="p-0" />}
             {srtErr && <ErrorNote>{srtErr}</ErrorNote>}
             {cues.length > 0 && (
-              <div className="max-h-72 space-y-0.5 overflow-y-auto">
+              <div className="max-h-72 space-y-1 overflow-y-auto">
                 {cues.map((c, i) => (
-                  <button key={i} onClick={() => seek(c.start)} disabled={!video} className={cn("flex w-full gap-3 rounded px-2 py-1 text-left text-xs hover:bg-panel-2 disabled:cursor-not-allowed", c === activeCue && "bg-accent/10")}>
-                    <span className="w-28 shrink-0 font-mono text-[11px] text-faint">
+                  <button key={i} type="button" onClick={() => seek(c.start)} disabled={!video} aria-pressed={c === activeCue} className={cn("flex w-full flex-col gap-0.5 rounded-ctl border-2 px-2 py-1.5 text-left text-[13px] disabled:cursor-not-allowed sm:flex-row sm:gap-3", c === activeCue ? "border-ink bg-accent" : "border-transparent hover:bg-panel-2")}>
+                    <span className="shrink-0 font-mono text-[12px] text-muted sm:w-32">
                       {tc(c.start)} - {tc(c.end)}
                     </span>
-                    <span dir="auto" className="min-w-0 whitespace-pre-line text-fg">
+                    <span dir="auto" className="min-w-0 whitespace-pre-line text-ink">
                       {c.text}
                     </span>
                   </button>
                 ))}
               </div>
             )}
-            {activeSubId && !srtLoading && !srtErr && !cues.length && <div className="text-xs text-muted">No cues could be parsed from this file (SRT expected).</div>}
+            {activeSubId && !srtLoading && !srtErr && !cues.length && <div className="text-[13px] text-muted">No cues could be parsed from this file (SRT expected).</div>}
           </div>
         </Card>
 
@@ -312,23 +327,23 @@ export default function PreviewPage() {
           <div className="space-y-2 p-4">
             {!audios.length && <Empty title="No audio assets" />}
             {audios.map((a) => (
-              <div key={a.id} className="flex flex-wrap items-center gap-3 rounded-md border border-line px-3 py-2">
+              <div key={a.id} className="flex flex-wrap items-center gap-3 rounded-ctl border-2 border-ink bg-panel px-3 py-2">
                 <div className="min-w-0 basis-48">
-                  <div className="truncate text-xs font-medium" dir="auto" title={a.label}>
+                  <div className="truncate text-[13px] font-semibold" dir="auto" title={a.label}>
                     {a.label}
                   </div>
-                  <div className="text-[11px] text-faint">
+                  <div className="font-mono text-[12px] text-faint">
                     {a.durationS ? `${a.durationS.toFixed(1)}s · ` : ""}v{a.version} · {ago(a.createdAt)}
                   </div>
                 </div>
-                <audio src={assetUrl(a.id)} controls preload="none" className="h-8 min-w-48 flex-1" />
+                <audio src={assetUrl(a.id)} controls preload="none" aria-label={`Play ${a.label}`} className="h-9 min-w-48 flex-1" />
               </div>
             ))}
           </div>
         </Card>
       </div>
 
-      <div className="min-w-0 space-y-5">
+      <div className="min-w-0 space-y-6">
         <Card>
           <CardHeader title="QA reports" sub="production.qa results" />
           <div className="space-y-3 p-4">
@@ -341,19 +356,20 @@ export default function PreviewPage() {
 
         <Card>
           <CardHeader title="Exports" />
-          <div className="space-y-1 p-4">
+          <div className="space-y-2 p-4">
             {!data.exports.length && <Empty title="No exports yet" />}
             {data.exports.map((e) => (
-              <div key={e.name} className="flex items-center justify-between gap-2 rounded-md border border-line px-3 py-2 text-xs">
+              <div key={e.name} className="flex items-center justify-between gap-2 rounded-ctl border-2 border-ink bg-panel px-3 py-2 text-[13px]">
                 <div className="min-w-0">
-                  <div className="truncate font-medium text-fg" title={e.name}>
+                  <div className="truncate font-semibold text-ink" title={e.name}>
                     {e.name}
                   </div>
-                  <div className="text-faint">
+                  <div className="font-mono text-[12px] text-faint">
                     {fmtBytes(e.size)} · {ago(e.modifiedAt)}
                   </div>
                 </div>
-                <a href={`/api/exports/file?projectId=${pid}&name=${encodeURIComponent(e.name)}`} className="inline-flex h-7 items-center rounded-md border border-line bg-panel-2 px-2.5 text-xs hover:bg-line">
+                <a href={`/api/exports/file?projectId=${pid}&name=${encodeURIComponent(e.name)}`} className={btnCls("default", "sm")}>
+                  <Download className="size-3.5" aria-hidden />
                   Download
                 </a>
               </div>

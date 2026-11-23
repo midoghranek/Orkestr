@@ -3,9 +3,9 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import { Plus } from "lucide-react";
+import { ChevronRight, Plus } from "lucide-react";
 import { ago, api, useApi } from "@/lib/api";
-import { Button, Card, CardHeader, Empty, Field, Input, Select, StatusBadge, Textarea, toast } from "@/components/ui";
+import { Button, Card, CardHeader, Empty, Field, Input, LoadingRows, Notice, Select, Skeleton, StatusBadge, Textarea, toast } from "@/components/ui";
 import { useProject } from "@/components/project-context";
 
 interface Template {
@@ -25,7 +25,15 @@ export default function FlowsPage() {
   const [vars, setVars] = useState<Record<string, string>>({});
   const [name, setName] = useState("");
   const [busy, setBusy] = useState(false);
-  if (!data) return <div className="p-6 text-xs text-faint">Loading…</div>;
+  if (!data)
+    return (
+      <div className="grid gap-6 p-4 sm:p-6 lg:p-8 xl:grid-cols-[minmax(0,1fr)_420px]">
+        <Card>
+          <LoadingRows rows={3} />
+        </Card>
+        <Skeleton className="h-64" />
+      </div>
+    );
   const t = templates.data?.find((x) => x.id === tpl);
 
   const create = async () => {
@@ -44,39 +52,44 @@ export default function FlowsPage() {
   };
 
   return (
-    <div className="grid gap-4 p-6 xl:grid-cols-[1fr_420px]">
-      <Card>
-        <CardHeader title="Workflows" />
+    <div className="grid gap-6 p-4 sm:p-6 lg:p-8 xl:grid-cols-[minmax(0,1fr)_420px]">
+      <Card className="self-start">
+        <CardHeader eyebrow="Library" title="Workflows" />
         {data.workflows.length === 0 ? (
           <div className="p-4">
             <Empty title="No workflows">Start from a template, a blank canvas, or let the AI Director build one from a brief.</Empty>
           </div>
         ) : (
-          <div className="divide-y divide-line">
+          <ul className="space-y-3 p-3 sm:p-4">
             {data.workflows.map((w) => {
               const last = data.runs.find((r) => r.workflowId === w.id);
               return (
-                <Link key={w.id} href={`/projects/${data.project.slug}/flows/${w.id}`} className="flex items-center gap-3 px-4 py-3 hover:bg-panel-2/50">
-                  <div className="min-w-0 flex-1">
-                    <div className="truncate text-[13px] font-medium">{w.name}</div>
-                    <div className="text-[11px] text-faint">
-                      {w.nodes} nodes · v{w.version} · {w.source} · edited {ago(w.updatedAt)}
+                <li key={w.id}>
+                  <Link href={`/projects/${data.project.slug}/flows/${w.id}`} className="nb-lift group flex min-h-16 items-center gap-3 rounded-card border-2 border-ink bg-panel px-4 py-3 shadow-brut-sm">
+                    <div className="min-w-0 flex-1">
+                      <div className="truncate font-display text-[16px] font-bold leading-tight text-ink" dir="auto">
+                        {w.name}
+                      </div>
+                      <div className="mt-1 break-words font-mono text-[12px] text-ink/75">
+                        {w.nodes} nodes · v{w.version} · {w.source} · edited {ago(w.updatedAt)}
+                      </div>
                     </div>
-                  </div>
-                  {last && <StatusBadge status={last.status} />}
-                </Link>
+                    {last && <StatusBadge status={last.status} />}
+                    <ChevronRight className="size-5 shrink-0 text-ink transition-transform group-hover:translate-x-0.5" aria-hidden />
+                  </Link>
+                </li>
               );
             })}
-          </div>
+          </ul>
         )}
       </Card>
-      <Card>
-        <CardHeader title="New workflow" />
-        <div className="space-y-3 p-4">
+      <Card className="self-start">
+        <CardHeader eyebrow="Create" title="New workflow" />
+        <div className="space-y-4 p-4">
           <Field label="Start from">
             <Select value={tpl} onChange={(e) => setTpl(e.target.value)} options={[{ value: "", label: "Blank canvas" }, ...(templates.data ?? []).map((x) => ({ value: x.id, label: `${x.name} · ${x.aspect} · ${x.durationS}s` }))]} />
           </Field>
-          {t && <div className="text-xs leading-relaxed text-muted">{t.description}</div>}
+          {t && <Notice tone="info">{t.description}</Notice>}
           <Field label="Name">
             <Input value={name} onChange={(e) => setName(e.target.value)} placeholder={t?.name ?? "Untitled flow"} />
           </Field>
@@ -90,7 +103,7 @@ export default function FlowsPage() {
             </Field>
           ))}
           <div className="flex justify-end">
-            <Button variant="primary" busy={busy} onClick={create}>
+            <Button variant="primary" size="lg" busy={busy} onClick={create}>
               <Plus className="size-4" /> Create
             </Button>
           </div>

@@ -1,9 +1,10 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { ChevronDown, ChevronRight, Check, X } from "lucide-react";
 import type { Registry, RegistryEntry } from "@/server/adapters/registry";
 import type { Settings } from "@/server/settings";
-import { Button, Card, CardHeader, Empty, ErrorNote, Field, Input, Notice, PageHeader, Pill, Spinner, StatusBadge, Textarea, toast } from "@/components/ui";
+import { Button, Card, CardHeader, Empty, ErrorNote, Field, Input, LoadingRows, Notice, PageHeader, Pill, Spinner, StatusBadge, Textarea, cn, toast } from "@/components/ui";
 import { ago, api, useApi } from "@/lib/api";
 
 interface SystemData {
@@ -54,9 +55,14 @@ export default function SettingsPage() {
 
   return (
     <div className="mx-auto max-w-5xl pb-12">
-      <PageHeader title="Settings" sub="Tools, models, credentials and budgets. Everything is stored locally." actions={loading ? <Spinner /> : undefined} />
-      <div className="space-y-5 px-6">
+      <PageHeader eyebrow="Studio configuration" title="Settings" sub="Tools, models, credentials and budgets. Everything is stored locally." actions={loading ? <Spinner /> : undefined} />
+      <div className="space-y-6 px-4 sm:px-6 lg:px-8">
         <ErrorNote>{error}</ErrorNote>
+        {loading && !data && !error && (
+          <Card>
+            <LoadingRows rows={4} />
+          </Card>
+        )}
         {data && (
           <>
             <ToolsSection registry={data.registry} discovering={discovering} onDiscover={discover} />
@@ -76,6 +82,7 @@ function ToolsSection({ registry, discovering, onDiscover }: { registry: Registr
   return (
     <Card>
       <CardHeader
+        eyebrow="01 · Tools"
         title="Tools & capabilities"
         sub={registry ? `Discovered ${ago(registry.generatedAt)}. Only verified capabilities are listed.` : "No discovery report yet."}
         actions={
@@ -84,7 +91,7 @@ function ToolsSection({ registry, discovering, onDiscover }: { registry: Registr
           </Button>
         }
       />
-      <div className="space-y-4 p-4">
+      <div className="space-y-5 p-4">
         {!registry ? (
           <Empty title="Nothing discovered yet" action={<Button variant="primary" busy={discovering} onClick={onDiscover}>Run discovery</Button>}>
             Discovery checks which local tools and APIs are actually installed and healthy. It never spends credits.
@@ -92,23 +99,23 @@ function ToolsSection({ registry, discovering, onDiscover }: { registry: Registr
         ) : (
           <>
             <EnvGrid env={registry.environment} />
-            <div className="space-y-2">
+            <ul className="space-y-2">
               {registry.tools.map((t) => (
                 <ToolRow key={t.id} tool={t} />
               ))}
-            </div>
+            </ul>
             {registry.unavailable.length > 0 && (
               <div>
-                <div className="mb-1.5 text-[11px] font-medium uppercase tracking-wide text-faint">Optional tools without an adapter</div>
+                <div className="nb-label mb-2 text-faint">Optional tools without an adapter</div>
                 <div className="grid gap-2 sm:grid-cols-2">
                   {registry.unavailable.map((u) => (
-                    <div key={u.id} className="rounded-md border border-line bg-bg px-3 py-2">
-                      <div className="flex items-center justify-between gap-2">
-                        <span className="text-[13px] font-medium text-fg">{u.name}</span>
+                    <div key={u.id} className="rounded-card border-2 border-ink bg-panel px-3 py-2.5">
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <span className="text-[14px] font-semibold text-ink">{u.name}</span>
                         <Pill tone={u.status === "present-no-adapter" ? "warn" : "default"}>{u.status}</Pill>
                       </div>
-                      <div className="mt-1 text-xs text-muted">{u.reason}</div>
-                      <div className="mt-0.5 text-[11px] text-faint">Would enable: {u.enables}</div>
+                      <div className="mt-1 text-[13px] text-muted">{u.reason}</div>
+                      <div className="mt-1 text-[12px] text-faint">Would enable: {u.enables}</div>
                     </div>
                   ))}
                 </div>
@@ -134,9 +141,9 @@ function EnvGrid({ env }: { env: Record<string, unknown> }) {
   return (
     <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-6">
       {keys.map(([k, label]) => (
-        <div key={k} className="rounded-md border border-line bg-bg px-3 py-2">
-          <div className="text-[11px] uppercase tracking-wide text-faint">{label}</div>
-          <div className="mt-0.5 break-words text-xs text-fg">{env[k] === undefined ? "none detected" : fmt(k, env[k])}</div>
+        <div key={k} className="rounded-card border-2 border-ink bg-panel px-3 py-2">
+          <div className="nb-label text-faint">{label}</div>
+          <div className="mt-0.5 break-words font-mono text-[13px] text-ink">{env[k] === undefined ? "none detected" : fmt(k, env[k])}</div>
         </div>
       ))}
     </div>
@@ -146,52 +153,71 @@ function EnvGrid({ env }: { env: Record<string, unknown> }) {
 function ToolRow({ tool }: { tool: RegistryEntry }) {
   const [open, setOpen] = useState(false);
   const ready = tool.capabilities.filter((c) => c.ready).length;
+  const Chev = open ? ChevronDown : ChevronRight;
+  const panelId = `tool-${tool.id}`;
   return (
-    <div className="rounded-md border border-line bg-bg">
-      <button onClick={() => setOpen((o) => !o)} className="flex w-full flex-wrap items-center gap-2 px-3 py-2 text-left" aria-expanded={open}>
-        <span className="w-3 text-faint">{open ? "▾" : "▸"}</span>
-        <span className="text-[13px] font-medium text-fg">{tool.name}</span>
-        {tool.discovery.version && <span className="text-[11px] text-faint">v{tool.discovery.version}</span>}
+    <li className="rounded-card border-2 border-ink bg-panel">
+      <button
+        type="button"
+        onClick={() => setOpen((o) => !o)}
+        className="flex min-h-12 w-full flex-wrap items-center gap-x-2 gap-y-1 rounded-card px-3 py-2 text-left transition-colors hover:bg-panel-2"
+        aria-expanded={open}
+        aria-controls={panelId}
+        aria-label={`${open ? "Hide" : "Show"} capabilities of ${tool.name}`}
+      >
+        <Chev className="size-5 shrink-0 text-ink" aria-hidden />
+        <span className="text-[14px] font-semibold text-ink">{tool.name}</span>
+        {tool.discovery.version && <span className="font-mono text-[12px] text-faint">v{tool.discovery.version}</span>}
         <StatusBadge status={tool.health.status} />
         <Pill>{tool.kind}</Pill>
-        <span className="min-w-0 flex-1 truncate text-xs text-muted">{tool.health.message}</span>
-        <span className="text-[11px] text-faint">
+        <span className="font-mono text-[12px] text-muted sm:ml-auto">
           {ready}/{tool.capabilities.length} ready
         </span>
+        <span className="w-full min-w-0 basis-full break-words pl-7 text-[13px] leading-snug text-muted [overflow-wrap:anywhere]">{tool.health.message}</span>
       </button>
       {open && (
-        <div className="space-y-2 border-t border-line px-3 py-2">
-          {tool.discovery.path && <div className="break-all text-[11px] text-faint">{tool.discovery.path}</div>}
-          {tool.capabilities.map((c) => (
-            <div key={c.id} className="rounded border border-line bg-panel px-2.5 py-2">
-              <div className="flex flex-wrap items-center gap-2">
-                <span className={c.ready ? "text-ok" : "text-err"} aria-label={c.ready ? "ready" : "not ready"}>
-                  {c.ready ? "✔" : "✘"}
-                </span>
-                <span className="text-[13px] text-fg">{c.label}</span>
-                <span className="text-[11px] text-faint">{c.id}</span>
-                {c.paid && <Pill tone="paid">paid</Pill>}
-              </div>
-              <div className="mt-1 text-xs text-muted">{c.description}</div>
-              {!c.ready && c.blockedReason && <div className="mt-1 text-xs text-warn">Blocked: {c.blockedReason}</div>}
-              <div className="mt-1 text-xs text-muted">
-                Cost:{" "}
-                {c.cost.model === "free" ? "free" : c.cost.model === "per_unit" ? `$${c.cost.usdPerUnit} per ${c.cost.unit} (${c.cost.source}, as of ${c.cost.asOf})` : "unknown"}
-                {c.cost.note ? ` — ${c.cost.note}` : ""}
-              </div>
-              {c.limitations && c.limitations.length > 0 && (
-                <ul className="mt-1 list-disc pl-4 text-[11px] text-muted">
-                  {c.limitations.map((l, i) => (
-                    <li key={i}>{l}</li>
-                  ))}
-                </ul>
-              )}
-              <div className="mt-1 text-[11px] text-faint">Verified by: {c.verifiedBy}</div>
-            </div>
-          ))}
+        <div id={panelId} className="space-y-2 border-t-2 border-line px-3 py-3">
+          {tool.discovery.path && <div className="break-all font-mono text-[12px] text-faint">{tool.discovery.path}</div>}
+          <ul className="divide-y-2 divide-line rounded-ctl border-2 border-line bg-white/50">
+            {tool.capabilities.map((c) => (
+              <li key={c.id} className="px-3 py-2.5">
+                <div className="flex flex-wrap items-center gap-2">
+                  <span
+                    className={cn("flex size-5 shrink-0 items-center justify-center rounded-full border-[1.5px] border-ink", c.ready ? "bg-ok-fill" : "bg-err-fill")}
+                    role="img"
+                    aria-label={c.ready ? "ready" : "not ready"}
+                  >
+                    {c.ready ? <Check className="size-3" aria-hidden /> : <X className="size-3" aria-hidden />}
+                  </span>
+                  <span className="text-[14px] font-semibold text-ink">{c.label}</span>
+                  <span className="font-mono text-[12px] text-faint">{c.id}</span>
+                  {c.paid && <Pill tone="paid">paid</Pill>}
+                </div>
+                <div className="mt-1 text-[13px] text-muted">{c.description}</div>
+                {!c.ready && c.blockedReason && (
+                  <div className="mt-1 text-[13px] font-medium text-warn">Blocked: {c.blockedReason}</div>
+                )}
+                <div className="mt-1 text-[13px] text-muted">
+                  Cost:{" "}
+                  <span className="font-mono">
+                    {c.cost.model === "free" ? "free" : c.cost.model === "per_unit" ? `$${c.cost.usdPerUnit} per ${c.cost.unit} (${c.cost.source}, as of ${c.cost.asOf})` : "unknown"}
+                  </span>
+                  {c.cost.note ? ` — ${c.cost.note}` : ""}
+                </div>
+                {c.limitations && c.limitations.length > 0 && (
+                  <ul className="mt-1 list-disc pl-4 text-[12px] text-muted">
+                    {c.limitations.map((l, i) => (
+                      <li key={i}>{l}</li>
+                    ))}
+                  </ul>
+                )}
+                <div className="mt-1 text-[12px] text-faint">Verified by: {c.verifiedBy}</div>
+              </li>
+            ))}
+          </ul>
         </div>
       )}
-    </div>
+    </li>
   );
 }
 
@@ -212,24 +238,31 @@ function WhisperSection({ installed }: { installed: string[] }) {
   const has = (id: string) => installed.some((m) => m === id || m.includes(id));
   return (
     <Card>
-      <CardHeader title="Whisper models" sub="Local transcription. Downloads are free from Hugging Face; progress appears in the live log on the Queue page." />
+      <CardHeader eyebrow="02 · Transcription" title="Whisper models" sub="Local transcription. Downloads are free from Hugging Face; progress appears in the live log on the Queue page." />
       <div className="space-y-3 p-4">
         <Notice>For Egyptian Arabic, use small or medium. tiny and base are noticeably less accurate on dialect speech.</Notice>
         <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
           {WHISPER.map((m) => (
-            <div key={m.id} className="flex flex-col gap-2 rounded-md border border-line bg-bg px-3 py-2">
-              <div className="flex items-center justify-between">
-                <span className="text-[13px] font-medium text-fg">{m.id}</span>
-                {has(m.id) ? <Pill tone="ok">installed</Pill> : <span className="text-[11px] text-faint">{m.size}</span>}
+            <div key={m.id} className="flex flex-col gap-2 rounded-card border-2 border-ink bg-panel px-3 py-3">
+              <div className="flex items-center justify-between gap-2">
+                <span className="font-mono text-[14px] font-semibold text-ink">{m.id}</span>
+                {has(m.id) ? (
+                  <Pill tone="ok">
+                    <Check className="size-3" aria-hidden />
+                    installed
+                  </Pill>
+                ) : (
+                  <span className="font-mono text-[12px] text-faint">{m.size}</span>
+                )}
               </div>
-              <div className="text-[11px] text-muted">{m.note}</div>
+              <div className="flex-1 text-[13px] text-muted">{m.note}</div>
               <Button size="sm" busy={busy === m.id} onClick={() => install(m.id)}>
                 {has(m.id) ? "Re-download" : `Download ${m.size}`}
               </Button>
             </div>
           ))}
         </div>
-        <div className="text-[11px] text-faint">Installed: {installed.length ? installed.join(", ") : "none"}</div>
+        <div className="break-words font-mono text-[12px] text-faint">Installed: {installed.length ? installed.join(", ") : "none"}</div>
       </div>
     </Card>
   );
@@ -270,41 +303,44 @@ function CredentialsSection({ creds, onChange }: { creds: SystemData["credential
 
   return (
     <Card>
-      <CardHeader title="Credentials" sub="Encrypted locally (AES-256-GCM). Only a masked hint is ever shown back." />
+      <CardHeader eyebrow="03 · Credentials" title="Credentials" sub="Encrypted locally (AES-256-GCM). Only a masked hint is ever shown back." />
       <div className="space-y-3 p-4">
         <Notice tone="warn">Only ElevenLabs has an adapter today. The other keys are stored for future adapters and are not used by anything yet.</Notice>
         {saved && <Notice tone="ok">Credentials changed. Re-run discovery (Tools section) so capabilities pick them up.</Notice>}
         {PROVIDER_INFO.map((p) => {
           const c = creds.find((x) => x.provider === p.id);
           return (
-            <div key={p.id} className="rounded-md border border-line bg-bg px-3 py-2.5">
-              <div className="flex flex-wrap items-center gap-2">
-                <span className="text-[13px] font-medium text-fg">{p.name}</span>
+            <div key={p.id} className="rounded-card border-2 border-ink bg-panel px-3 py-3 sm:px-4">
+              <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                <span className="text-[14px] font-semibold text-ink">{p.name}</span>
                 {c ? <Pill tone="ok">configured</Pill> : <Pill>not set</Pill>}
                 {c && (
-                  <span className="text-xs text-muted">
+                  <span className="font-mono text-[12px] text-muted">
                     {c.hint} · {c.source === "env" ? "from environment variable" : `saved ${ago(c.updatedAt)}`}
                   </span>
                 )}
               </div>
-              <div className="mt-0.5 text-[11px] text-faint">{p.note}</div>
-              <div className="mt-2 flex flex-wrap items-center gap-2">
+              <div className="mt-1 text-[12px] text-faint">{p.note}</div>
+              <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:items-center">
                 <Input
                   type="password"
                   autoComplete="off"
+                  aria-label={`${p.name} API key`}
                   placeholder={c ? "Paste a new key to replace" : "Paste API key"}
                   value={drafts[p.id] ?? ""}
                   onChange={(e) => setDrafts((d) => ({ ...d, [p.id]: e.target.value }))}
-                  className="min-w-56 flex-1"
+                  className="w-full font-mono sm:min-w-56 sm:flex-1"
                 />
-                <Button size="sm" variant="primary" busy={busy === p.id} disabled={(drafts[p.id] ?? "").trim().length < 8} onClick={() => save(p.id)}>
-                  Save
-                </Button>
-                {c && c.source === "store" && (
-                  <Button size="sm" variant="danger" busy={busy === p.id} onClick={() => remove(p.id)}>
-                    Remove
+                <div className="flex gap-2">
+                  <Button variant="primary" busy={busy === p.id} disabled={(drafts[p.id] ?? "").trim().length < 8} onClick={() => save(p.id)}>
+                    Save
                   </Button>
-                )}
+                  {c && c.source === "store" && (
+                    <Button variant="danger" busy={busy === p.id} onClick={() => remove(p.id)}>
+                      Remove
+                    </Button>
+                  )}
+                </div>
               </div>
             </div>
           );
@@ -375,13 +411,13 @@ function BudgetSection({ settings, onSaved }: { settings: Settings; onSaved: () 
 
   return (
     <Card>
-      <CardHeader title="Budgets & defaults" actions={<Button size="sm" variant="primary" busy={busy} onClick={save}>Save changes</Button>} />
+      <CardHeader eyebrow="04 · Budgets" title="Budgets & defaults" actions={<Button size="sm" variant="primary" busy={busy} onClick={save}>Save changes</Button>} />
       <div className="space-y-4 p-4">
         <Notice>
           Auto-approve limit 0 means every paid step needs explicit approval. Steps whose price is unknown always need approval, regardless of this limit.
         </Notice>
         <ErrorNote>{err}</ErrorNote>
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           <Field label="Concurrency" hint="Max node jobs running at once (1-8)">
             <Input type="number" min={1} max={8} step={1} value={f.concurrency} onChange={set("concurrency")} />
           </Field>
@@ -402,7 +438,7 @@ function BudgetSection({ settings, onSaved }: { settings: Settings; onSaved: () 
           </Field>
         </div>
         <Field label="Import folders" hint="One absolute path per line. Orkestr may read media from these folders only (read-only).">
-          <Textarea value={f.importRoots} onChange={set("importRoots")} placeholder={"C:\\Users\\you\\Videos"} className="font-mono text-xs" />
+          <Textarea value={f.importRoots} onChange={set("importRoots")} placeholder={"C:\\Users\\you\\Videos"} className="font-mono text-[13px]" />
         </Field>
       </div>
     </Card>

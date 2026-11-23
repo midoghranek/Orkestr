@@ -36,7 +36,7 @@ Install/configure a provider (ComfyUI server on 127.0.0.1:8188, or fal/Runway/Hi
 ### Reference and consistency guidance (no guarantees)
 - Reuse the same graded brand photos, logo asset and palette across deliverables; consistency comes from reusing assets, not from a model.
 - If a generator is added later: pass the same reference images and a fixed `seed` where the provider supports it, keep prompts templated, review every output; consistency of faces/products is not guaranteed and each regeneration costs money.
-- Photos that are crops of generated concept boards (like kafeeh's) are placeholders: tag them in `note`, mark scenes `placeholder`, and keep the draft banner on video cuts.
+- Photos that are crops of generated concept boards (like the dummy stills in the acme-cafe demo) are placeholders: tag them in `note`, mark scenes `placeholder`, and keep the draft banner on video cuts.
 
 ## Tool dependencies
 `playwright.screenshot`, `photocraft.grade`, `vectorcraft.rasterize`, `remotion.still` (all free, local); the live product URL must be reachable.
@@ -53,4 +53,4 @@ Install/configure a provider (ComfyUI server on 127.0.0.1:8188, or fal/Runway/Hi
 - You looked at the output (e.g. via `GET /api/assets/{id}/file`) before declaring it done.
 
 ## Examples
-Poster graph: `import(bg) -> image.grade -> image.poster(aspect "4:5", headline "كافيهك تحت سيطرتك") -> production.export(name "kafeeh-poster-4x5")`, with `import(logo_rev) -> image.poster.logo`. Template-free nodes: `{"id":"cap1","type":"image.capture","params":{"url":"https://cafeos-app.vercel.app","width":1440,"height":900,"scrollTo":900}}`.
+Poster graph: `import(bg) -> image.grade -> image.poster(aspect "4:5", headline "صباحك على مزاجك") -> production.export(name "acme-cafe-poster-4x5")`, with `import(logo_rev) -> image.poster.logo`. Template-free nodes: `{"id":"cap1","type":"image.capture","params":{"url":"https://example.com","width":1440,"height":900,"scrollTo":900}}`.

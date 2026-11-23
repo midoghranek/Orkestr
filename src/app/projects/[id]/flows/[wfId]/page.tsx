@@ -19,11 +19,11 @@ import {
   type Node,
 } from "@xyflow/react";
 import dagre from "@dagrejs/dagre";
-import { AlertTriangle, Check, LayoutGrid, Lock, Play, RotateCcw, Save, Square, Trash2 } from "lucide-react";
+import { AlertTriangle, Check, ChevronDown, ChevronUp, Download, LayoutGrid, Lock, PanelRight, Play, Plus, RotateCcw, Save, Search, Square, Trash2, X } from "lucide-react";
 import type { Graph, NodeTypeInfo, PortType, ValidationIssue } from "@/shared/schema";
 import { ago, api, fmtUsd, useApi, useEvents, type OrkEvent } from "@/lib/api";
-import { AssetPreview, Button, cn, Field, Input, Pill, Progress, Select, StatusBadge, toast, type AssetLite } from "@/components/ui";
-import { OrkNode, PORT_COLORS, type OrkNodeData } from "@/components/flow/ork-node";
+import { AssetPreview, Button, cn, ErrorNote, Field, IconButton, Input, Notice, Pill, Progress, Select, Skeleton, StatusBadge, Tabs, toast, type AssetLite } from "@/components/ui";
+import { FAMILY_COLORS, OrkNode, PORT_COLORS, type OrkNodeData } from "@/components/flow/ork-node";
 import { ParamsForm } from "@/components/flow/params-form";
 import { useProject } from "@/components/project-context";
 
@@ -119,6 +119,9 @@ function Editor() {
   const [preauth, setPreauth] = useState("0");
   const [busy, setBusy] = useState<string | null>(null);
   const [bottom, setBottom] = useState<"issues" | "log">("issues");
+  // Below lg the palette and inspector are overlay drawers; only one is open at a time.
+  const [drawer, setDrawer] = useState<"none" | "palette" | "inspector">("none");
+  const narrow = () => typeof window !== "undefined" && window.matchMedia("(max-width: 1023px)").matches;
   const loadedRef = useRef(false);
   const byType = useMemo(() => new Map((types.data ?? []).map((t) => [t.type, t])), [types.data]);
 
@@ -290,33 +293,48 @@ function Editor() {
   const pendingApprovals = run.data?.approvals.filter((a) => a.status === "pending") ?? [];
 
   return (
-    <div className="flex h-[calc(100vh-113px)] flex-col">
+    <div className="flex min-h-[560px] flex-[1_1_0px] flex-col">
       {/* Toolbar */}
-      <div className="flex flex-wrap items-center gap-2 border-b border-line bg-panel px-3 py-2">
-        <input value={name} onChange={(e) => (setName(e.target.value), markDirty())} className="h-7 w-64 rounded border border-transparent bg-transparent px-1.5 text-[13px] font-semibold hover:border-line focus:border-line focus:outline-none" aria-label="Workflow name" />
-        <span className="text-[11px] text-faint">v{version}{dirty ? " · unsaved" : ""}</span>
-        <div className="mx-1 h-5 w-px bg-line" />
-        <Button size="sm" onClick={save} busy={busy === "save"} disabled={!dirty}>
+      <div className="flex flex-wrap items-center gap-2 border-b-2 border-ink bg-panel px-3 py-2">
+        <Button size="sm" variant="outline" className="lg:hidden" aria-expanded={drawer === "palette"} onClick={() => setDrawer(drawer === "palette" ? "none" : "palette")}>
+          <Plus className="size-4" /> Nodes
+        </Button>
+        <input
+          value={name}
+          onChange={(e) => (setName(e.target.value), markDirty())}
+          className="h-8 min-w-0 flex-1 basis-40 rounded-ctl border-2 border-transparent bg-transparent px-2 font-display text-[17px] font-bold hover:border-ink/25 focus:border-ink focus:bg-white focus:outline-none sm:max-w-72"
+          aria-label="Workflow name"
+        />
+        <span className={cn("rounded-full border-[1.5px] px-2 font-mono text-[11px] font-semibold leading-5", dirty ? "border-ink bg-warn-fill text-ink" : "border-ink/30 text-muted")}>
+          v{version}
+          {dirty ? " · unsaved" : " · saved"}
+        </span>
+        <Button size="sm" variant={dirty ? "primary" : "default"} onClick={save} busy={busy === "save"} disabled={!dirty}>
           <Save className="size-3.5" /> Save
         </Button>
         <Button size="sm" variant="ghost" onClick={() => (setNodes(layout(nodes, edges)), markDirty(), setTimeout(() => rf.fitView({ padding: 0.15 }), 30))}>
-          <LayoutGrid className="size-3.5" /> Auto-layout
+          <LayoutGrid className="size-3.5" /> <span className="max-sm:sr-only">Auto-layout</span>
         </Button>
-        <span className={cn("flex items-center gap-1 text-[11px]", errors.length ? "text-err" : "text-ok")}>
-          {errors.length ? <AlertTriangle className="size-3.5" /> : <Check className="size-3.5" />}
+        <button
+          type="button"
+          onClick={() => setBottom("issues")}
+          className={cn("inline-flex h-8 items-center gap-1 rounded-full border-[1.5px] border-ink px-2.5 font-mono text-[11px] font-semibold uppercase", errors.length ? "bg-err-fill" : "bg-ok-fill")}
+        >
+          {errors.length ? <AlertTriangle className="size-3.5" aria-hidden /> : <Check className="size-3.5" aria-hidden />}
           {errors.length ? `${errors.length} issue${errors.length > 1 ? "s" : ""}` : "valid"}
-        </span>
-        <div className="ml-auto flex items-center gap-2">
-          <label className="flex items-center gap-1 text-[11px] text-muted" title="Paid steps whose known price fits this budget run without asking. Unknown prices always ask.">
-            <Lock className="size-3 text-paid" /> preauthorize $
-            <input value={preauth} onChange={(e) => setPreauth(e.target.value)} type="number" min={0} step="0.5" className="h-7 w-16 rounded border border-line bg-bg px-1.5 text-xs" />
+        </button>
+        <div className="flex w-full flex-wrap items-center gap-2 sm:ml-auto sm:w-auto">
+          <label className="flex h-8 items-center gap-1.5 rounded-ctl border-2 border-ink bg-paid-fill pl-2 text-[12px] font-semibold text-ink" title="Paid steps whose known price fits this budget run without asking. Unknown prices always ask.">
+            <Lock className="size-3.5" aria-hidden /> Preauthorize $
+            <input value={preauth} onChange={(e) => setPreauth(e.target.value)} type="number" min={0} step="0.5" className="h-full w-16 rounded-r-[4px] border-l-2 border-ink bg-white px-1.5 font-mono text-[13px] focus:outline-none" aria-label="Preauthorized budget in USD" />
           </label>
           <Button size="sm" variant="primary" onClick={startRun} busy={busy === "run"} disabled={errors.length > 0 || nodes.length === 0}>
             <Play className="size-3.5" /> Run
           </Button>
           {runs.data && runs.data.length > 0 && (
             <Select
-              className="h-7 w-52 text-xs"
+              aria-label="Select run"
+              className="h-8 w-44 text-[13px]"
               value={runId ?? ""}
               onChange={(e) => (setRunId(e.target.value), router.replace(`?run=${e.target.value}`))}
               options={runs.data.map((r) => ({ value: r.id, label: `${r.status} · ${ago(r.createdAt)}` }))}
@@ -335,22 +353,32 @@ function Editor() {
         </div>
       </div>
       {run.data && (
-        <div className="flex items-center gap-3 border-b border-line bg-panel/60 px-3 py-1.5 text-[11px]">
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 border-b-2 border-ink bg-panel-2 px-3 py-2 text-[12px]">
           <StatusBadge status={run.data.run.status} />
-          <Progress className="max-w-xs" value={run.data.run.progress} tone={run.data.run.status === "failed" ? "err" : run.data.run.status === "completed" ? "ok" : "accent"} />
-          <span className="text-muted">{Object.entries(run.data.run.counts).map(([k, v]) => `${v} ${k}`).join(" · ")}</span>
-          <span className="text-muted">spent {fmtUsd(run.data.run.spentUsd)}</span>
+          <Progress className="w-40 max-w-xs" label="Run progress" value={run.data.run.progress} tone={run.data.run.status === "failed" ? "err" : run.data.run.status === "completed" ? "ok" : "accent"} />
+          <span className="font-mono text-muted">{Object.entries(run.data.run.counts).map(([k, v]) => `${v} ${k}`).join(" · ")}</span>
+          <span className="font-mono text-muted">spent {fmtUsd(run.data.run.spentUsd)}</span>
           {pendingApprovals.length > 0 && (
-            <a href="/queue" className="ml-auto text-accent underline">
+            <a href="/queue" className="inline-flex items-center gap-1 rounded-full border-2 border-ink bg-accent px-2.5 py-0.5 font-semibold text-ink sm:ml-auto">
               {pendingApprovals.length} waiting for approval →
             </a>
           )}
-          {run.data.run.error && <span className="truncate text-err">{run.data.run.error}</span>}
+          {run.data.run.error && <span className="min-w-0 truncate text-err">{run.data.run.error}</span>}
         </div>
       )}
 
-      <div className="flex min-h-0 flex-1">
-        <Palette types={types.data ?? []} onAdd={addNode} />
+      <div className="relative flex min-h-0 flex-[1_1_0px]">
+        {drawer !== "none" && <button type="button" aria-label="Close panel" className="absolute inset-0 z-20 bg-ink/30 lg:hidden" onClick={() => setDrawer("none")} />}
+        <div className={cn("max-lg:absolute max-lg:inset-y-0 max-lg:left-0 max-lg:z-30 max-lg:shadow-brut-lg", drawer === "palette" ? "flex" : "max-lg:hidden lg:flex")}>
+          <Palette
+            types={types.data ?? []}
+            onClose={() => setDrawer("none")}
+            onAdd={(t, pos) => {
+              addNode(t, pos);
+              if (narrow()) setDrawer("none");
+            }}
+          />
+        </div>
         <div
           className="relative min-w-0 flex-1"
           onDragOver={(e) => e.preventDefault()}
@@ -359,6 +387,7 @@ function Editor() {
             if (t) addNode(t, rf.screenToFlowPosition({ x: e.clientX, y: e.clientY }));
           }}
         >
+          <div className="absolute inset-0">
           <ReactFlow
             nodes={nodes}
             edges={edges}
@@ -371,20 +400,52 @@ function Editor() {
             onConnect={onConnect}
             isValidConnection={isValidConnection}
             onSelectionChange={({ nodes: s }) => setSelected(s[0]?.id ?? null)}
+            onNodeClick={() => narrow() && setDrawer("inspector")}
             deleteKeyCode={["Delete", "Backspace"]}
-            forceColorMode="dark"
+            forceColorMode="light"
             minZoom={0.15}
             fitView
           >
-            <Background variant={BackgroundVariant.Dots} gap={18} size={1} color="#2a2e34" />
+            <Background variant={BackgroundVariant.Dots} gap={20} size={1.6} color="#c9bda6" />
             <Controls position="bottom-left" />
-            <MiniMap pannable zoomable position="bottom-right" nodeColor={(n) => ((n.data as OrkNodeData).run?.status === "failed" ? "#e5675e" : (n.data as OrkNodeData).run?.status === "completed" ? "#5fbf8f" : "#343941")} />
+            <MiniMap
+              className="max-sm:!hidden"
+              pannable
+              zoomable
+              position="bottom-right"
+              nodeStrokeColor="#17140f"
+              nodeStrokeWidth={3}
+              nodeColor={(n) => ((n.data as OrkNodeData).run?.status === "failed" ? "#ffb8a6" : (n.data as OrkNodeData).run?.status === "completed" ? "#9bebc4" : (n.data as OrkNodeData).run?.status === "running" ? "#b9d3ff" : "#fffcf5")}
+            />
           </ReactFlow>
+          </div>
+          {!wf.data && !wf.error && (
+            <div className="absolute inset-0 flex items-center justify-center">
+              <Skeleton className="h-40 w-72 rounded-card" />
+            </div>
+          )}
+          {wf.error && (
+            <div className="absolute inset-x-4 top-4">
+              <ErrorNote>{wf.error}</ErrorNote>
+            </div>
+          )}
           {nodes.length === 0 && wf.data && (
-            <div className="pointer-events-none absolute inset-0 flex items-center justify-center text-xs text-muted">Drag nodes from the palette, or click one to add it.</div>
+            <div className="pointer-events-none absolute inset-0 flex items-center justify-center p-6">
+              <div className="rounded-card border-2 border-dashed border-ink/50 bg-panel/80 px-5 py-4 text-center text-[13px] text-muted">
+                <div className="font-display text-[16px] font-bold text-ink">Empty canvas</div>
+                Drag nodes from the palette, or click one to add it.
+              </div>
+            </div>
+          )}
+          {sel && (
+            <Button size="sm" className="absolute right-3 top-3 z-10 lg:hidden" onClick={() => setDrawer("inspector")}>
+              <PanelRight className="size-4" /> Inspect
+            </Button>
           )}
         </div>
+        <div className={cn("max-lg:absolute max-lg:inset-y-0 max-lg:right-0 max-lg:z-30 max-lg:w-[min(22rem,100%)] max-lg:shadow-brut-lg", drawer === "inspector" ? "flex" : "max-lg:hidden lg:flex")}>
         <Inspector
+          onClose={() => setDrawer("none")}
           key={selected ?? "none"}
           node={sel}
           nodeRun={selRun}
@@ -402,6 +463,7 @@ function Editor() {
           }}
           onRerun={() => runId && runAction(`/api/runs/${runId}/rerun`, { nodeIds: [selected] }, "New run: this node is forced, everything unaffected is reused")}
         />
+        </div>
       </div>
 
       <BottomPanel tab={bottom} setTab={setBottom} issues={issues} runId={runId} onPick={(id) => setSelected(id)} />
@@ -409,16 +471,25 @@ function Editor() {
   );
 }
 
-function Palette({ types, onAdd }: { types: NodeTypeInfo[]; onAdd: (t: NodeTypeInfo) => void }) {
+function Palette({ types, onAdd, onClose }: { types: NodeTypeInfo[]; onAdd: (t: NodeTypeInfo, pos?: { x: number; y: number }) => void; onClose: () => void }) {
   const [q, setQ] = useState("");
   const [showUnavailable, setShowUnavailable] = useState(true);
   const list = types.filter((t) => (showUnavailable || t.available) && (!q || `${t.label} ${t.type} ${t.description}`.toLowerCase().includes(q.toLowerCase())));
   return (
-    <aside className="flex w-60 shrink-0 flex-col border-r border-line bg-panel">
-      <div className="space-y-2 border-b border-line p-2">
-        <Input placeholder="Search nodes…" value={q} onChange={(e) => setQ(e.target.value)} />
-        <label className="flex items-center gap-1.5 text-[11px] text-muted">
-          <input type="checkbox" checked={showUnavailable} onChange={(e) => setShowUnavailable(e.target.checked)} /> show unavailable
+    <aside className="flex w-64 shrink-0 flex-col border-r-2 border-ink bg-panel" aria-label="Node palette">
+      <div className="space-y-2 border-b-2 border-ink p-3">
+        <div className="flex items-center justify-between">
+          <span className="nb-label text-muted">Nodes</span>
+          <IconButton label="Close palette" className="size-8 lg:hidden" onClick={onClose}>
+            <X className="size-4" />
+          </IconButton>
+        </div>
+        <div className="relative">
+          <Search className="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-muted" aria-hidden />
+          <Input placeholder="Search nodes…" aria-label="Search nodes" value={q} onChange={(e) => setQ(e.target.value)} className="h-9 pl-8 text-[13px]" />
+        </div>
+        <label className="flex min-h-8 cursor-pointer items-center gap-2 text-[12px] font-medium text-muted">
+          <input type="checkbox" className="size-4 accent-[var(--color-ink)]" checked={showUnavailable} onChange={(e) => setShowUnavailable(e.target.checked)} /> Show unavailable
         </label>
       </div>
       <div className="flex-1 overflow-y-auto p-2">
@@ -427,7 +498,10 @@ function Palette({ types, onAdd }: { types: NodeTypeInfo[]; onAdd: (t: NodeTypeI
           if (!items.length) return null;
           return (
             <div key={f} className="mb-3">
-              <div className="mb-1 px-1 text-[10px] font-semibold uppercase tracking-wider text-faint">{FAMILY_LABEL[f]}</div>
+              <div className="nb-label mb-1 flex items-center gap-1.5 px-1 text-faint">
+                <span className="size-2.5 rounded-full border border-ink" style={{ background: FAMILY_COLORS[f] }} aria-hidden />
+                {FAMILY_LABEL[f]}
+              </div>
               {items.map((t) => (
                 <button
                   key={t.type}
@@ -435,11 +509,14 @@ function Palette({ types, onAdd }: { types: NodeTypeInfo[]; onAdd: (t: NodeTypeI
                   onDragStart={(e) => e.dataTransfer.setData("application/orkestr-node", t.type)}
                   onClick={() => (t.available ? onAdd(t) : toast(t.unavailableReason ?? "unavailable", "info"))}
                   title={t.available ? t.description : `Unavailable: ${t.unavailableReason}`}
-                  className={cn("mb-0.5 flex w-full items-center gap-2 rounded px-2 py-1.5 text-left text-xs", t.available ? "text-fg hover:bg-panel-2" : "cursor-help text-faint")}
+                  className={cn(
+                    "mb-1 flex min-h-9 w-full items-center gap-2 rounded-ctl border-2 px-2.5 py-1.5 text-left text-[13px] font-medium",
+                    t.available ? "cursor-grab border-transparent text-ink hover:border-ink hover:bg-white hover:shadow-brut-xs active:cursor-grabbing" : "cursor-help border-transparent text-faint",
+                  )}
                 >
                   <span className="min-w-0 flex-1 truncate">{t.label}</span>
                   {t.paid && <Pill tone="paid">paid</Pill>}
-                  {!t.available && <AlertTriangle className="size-3 shrink-0 text-warn/70" />}
+                  {!t.available && <AlertTriangle className="size-3.5 shrink-0 text-warn" aria-label="unavailable" />}
                 </button>
               ))}
             </div>
@@ -458,7 +535,9 @@ function Inspector({
   onChange,
   onDelete,
   onRerun,
+  onClose,
 }: {
+  onClose: () => void;
   node?: FNode;
   nodeRun?: NodeRunView;
   runId: string | null;
@@ -470,13 +549,18 @@ function Inspector({
   const [tab, setTab] = useState<"params" | "output">(nodeRun && nodeRun.status !== "pending" ? "output" : "params");
   if (!node)
     return (
-      <aside className="w-80 shrink-0 border-l border-line bg-panel p-4 text-xs text-muted">
-        Select a node to edit its parameters, inspect outputs, logs and errors, or rerun it.
-        <div className="mt-4 space-y-1.5">
-          <div className="text-[10px] font-semibold uppercase tracking-wider text-faint">Port types</div>
+      <aside className="w-full shrink-0 overflow-y-auto border-l-2 border-ink bg-panel p-4 text-[13px] text-muted lg:w-80" aria-label="Inspector">
+        <div className="flex items-start justify-between gap-2">
+          <p>Select a node to edit its parameters, inspect outputs, logs and errors, or rerun it.</p>
+          <IconButton label="Close inspector" className="size-8 lg:hidden" onClick={onClose}>
+            <X className="size-4" />
+          </IconButton>
+        </div>
+        <div className="mt-5 space-y-2">
+          <div className="nb-label text-faint">Port types</div>
           {Object.entries(PORT_COLORS).map(([k, c]) => (
-            <div key={k} className="flex items-center gap-2">
-              <span className="size-2.5 rounded-full" style={{ background: c }} />
+            <div key={k} className="flex items-center gap-2 font-mono text-[12px] text-ink">
+              <span className="size-3 rounded-full border-2 border-ink" style={{ background: c }} aria-hidden />
               {k}
             </div>
           ))}
@@ -485,31 +569,45 @@ function Inspector({
     );
   const info = node.data.info;
   return (
-    <aside className="flex w-80 shrink-0 flex-col border-l border-line bg-panel">
-      <div className="border-b border-line p-3">
-        <div className="flex items-center gap-2">
+    <aside className="flex w-full shrink-0 flex-col border-l-2 border-ink bg-panel lg:w-80" aria-label="Inspector">
+      <div className="border-b-2 border-ink p-3">
+        <div className="flex items-start gap-2">
           <div className="min-w-0 flex-1">
-            <div className="truncate text-[13px] font-semibold">{node.data.label || info?.label}</div>
-            <div className="text-[11px] text-faint">
+            <div className="truncate font-display text-[17px] font-bold leading-tight">{node.data.label || info?.label}</div>
+            <div className="mt-0.5 truncate font-mono text-[12px] text-faint">
               {node.id} · {node.data.type}
             </div>
           </div>
-          <Button size="sm" variant="ghost" onClick={onDelete} aria-label="Delete node">
-            <Trash2 className="size-3.5" />
-          </Button>
+          <IconButton label="Delete node" className="size-8 hover:bg-err-fill" onClick={onDelete}>
+            <Trash2 className="size-4" />
+          </IconButton>
+          <IconButton label="Close inspector" className="size-8 lg:hidden" onClick={onClose}>
+            <X className="size-4" />
+          </IconButton>
         </div>
-        {info && <div className="mt-2 text-[11px] leading-relaxed text-muted">{info.description}</div>}
-        {info && !info.available && <div className="mt-2 rounded border border-warn/30 bg-warn/10 px-2 py-1.5 text-[11px] text-warn">Unavailable: {info.unavailableReason}</div>}
-        {info?.paid && <div className="mt-2 rounded border border-paid/30 bg-paid/10 px-2 py-1.5 text-[11px] text-paid">Paid step: the run pauses for your approval before anything is spent.</div>}
-        <div className="mt-2 flex gap-1">
-          {(["params", "output"] as const).map((t) => (
-            <button key={t} onClick={() => setTab(t)} className={cn("rounded px-2 py-1 text-[11px]", tab === t ? "bg-panel-2 text-fg" : "text-muted hover:text-fg")}>
-              {t === "params" ? "Parameters" : "Run output"}
-            </button>
-          ))}
-        </div>
+        {info && <div className="mt-2 text-[13px] leading-relaxed text-muted">{info.description}</div>}
+        {info && !info.available && (
+          <Notice tone="warn" className="mt-2">
+            Unavailable: {info.unavailableReason}
+          </Notice>
+        )}
+        {info?.paid && (
+          <div className="mt-2 flex gap-2 rounded-ctl border-2 border-ink bg-paid-fill px-3 py-2 text-[13px] text-ink">
+            <Lock className="mt-0.5 size-4 shrink-0" aria-hidden />
+            Paid step: the run pauses for your approval before anything is spent.
+          </div>
+        )}
+        <Tabs
+          className="-mx-1 mt-2"
+          value={tab}
+          onChange={setTab}
+          tabs={[
+            { value: "params", label: "Parameters" },
+            { value: "output", label: "Run output" },
+          ]}
+        />
       </div>
-      <div className="flex-1 space-y-3 overflow-y-auto p-3">
+      <div className="flex-1 space-y-4 overflow-y-auto p-3">
         {tab === "params" ? (
           <>
             <Field label="Label">
@@ -521,7 +619,7 @@ function Inspector({
               </Field>
             )}
             {info && <ParamsForm schema={info.paramsJsonSchema as never} value={node.data.params} onChange={(params) => onChange({ params })} />}
-            <div className="grid grid-cols-2 gap-2 border-t border-line pt-3">
+            <div className="grid grid-cols-2 gap-2 border-t-2 border-line pt-3">
               <Field label="Max attempts">
                 <Input type="number" min={1} max={10} value={node.data.retry?.maxAttempts ?? ""} placeholder="3" onChange={(e) => onChange({ retry: { ...node.data.retry, maxAttempts: e.target.value ? Number(e.target.value) : undefined } })} />
               </Field>
@@ -530,17 +628,15 @@ function Inspector({
               </Field>
             </div>
             {!!node.data.issues?.length && (
-              <div className="space-y-1">
+              <div className="space-y-1.5">
                 {node.data.issues.map((i) => (
-                  <div key={i} className="rounded border border-err/30 bg-err/10 px-2 py-1 text-[11px] text-err">
-                    {i}
-                  </div>
+                  <ErrorNote key={i}>{i}</ErrorNote>
                 ))}
               </div>
             )}
           </>
         ) : !nodeRun ? (
-          <div className="text-xs text-muted">{runId ? "This node is not part of the selected run (added after it started)." : "No run yet."}</div>
+          <div className="text-[13px] text-muted">{runId ? "This node is not part of the selected run (added after it started)." : "No run yet."}</div>
         ) : (
           <NodeRunPanel nr={nodeRun} onRerun={onRerun} />
         )}
@@ -555,30 +651,30 @@ function NodeRunPanel({ nr, onRerun }: { nr: NodeRunView; onRerun: () => void })
     <div className="space-y-3">
       <div className="flex flex-wrap items-center gap-2">
         <StatusBadge status={nr.status} />
-        <span className="text-[11px] text-faint">
+        <span className="font-mono text-[12px] text-faint">
           attempt {nr.attempt}/{nr.maxAttempts}
         </span>
         {nr.cachedFrom && <Pill tone="info">reused from cache</Pill>}
         {nr.costUsd > 0 && <Pill tone="paid">{fmtUsd(nr.costUsd)}</Pill>}
       </div>
-      {nr.status === "running" && <Progress value={nr.progress} indeterminate={nr.progress === 0} tone="info" />}
-      {nr.progressMessage && <div className="text-[11px] text-muted">{nr.progressMessage}</div>}
+      {nr.status === "running" && <Progress label="Node progress" value={nr.progress} indeterminate={nr.progress === 0} tone="info" />}
+      {nr.progressMessage && <div className="text-[13px] text-muted">{nr.progressMessage}</div>}
       {nr.estimate && (
-        <div className="text-[11px] text-muted">
+        <div className="text-[12px] text-muted">
           Estimate: {fmtUsd(nr.estimate.usd, nr.estimate.known)}
           {nr.estimate.quantity ? ` · ${nr.estimate.quantity} ${nr.estimate.unit}s` : ""} — {nr.estimate.basis}
         </div>
       )}
       {nr.error && (
-        <div className="rounded border border-err/30 bg-err/10 px-2 py-1.5 text-[11px] text-err">
-          <span className="font-semibold">{nr.error.code}</span> {nr.error.message}
-        </div>
+        <ErrorNote>
+          <span className="font-mono font-semibold">{nr.error.code}</span> {nr.error.message}
+        </ErrorNote>
       )}
       {outs.map(([port, vals]) => (
         <div key={port}>
-          <div className="mb-1 text-[10px] font-semibold uppercase tracking-wider text-faint">{port}</div>
+          <div className="nb-label mb-1.5 text-faint">{port}</div>
           <div className="space-y-2">
-            {vals.map((v, i) => ("assetId" in v ? <OutputAsset key={v.assetId} id={v.assetId} /> : <pre key={i} className="max-h-48 overflow-auto rounded bg-bg p-2 text-[10px] text-muted" dir="auto">{typeof v.value === "string" ? v.value : JSON.stringify(v.value, null, 2)}</pre>))}
+            {vals.map((v, i) => ("assetId" in v ? <OutputAsset key={v.assetId} id={v.assetId} /> : <pre key={i} className="max-h-48 overflow-auto rounded-ctl border-2 border-ink/20 bg-bg p-2 text-[12px] text-ink" dir="auto">{typeof v.value === "string" ? v.value : JSON.stringify(v.value, null, 2)}</pre>))}
           </div>
         </div>
       ))}
@@ -594,12 +690,12 @@ function NodeRunPanel({ nr, onRerun }: { nr: NodeRunView; onRerun: () => void })
 
 function OutputAsset({ id }: { id: string }) {
   const { data } = useApi<{ asset: AssetLite & { size: number } }>(`/api/assets/${id}`);
-  if (!data) return <div className="h-10 animate-pulse rounded bg-panel-2" />;
+  if (!data) return <Skeleton className="h-24" />;
   const a = data.asset;
   return (
-    <div className="overflow-hidden rounded border border-line">
+    <div className="overflow-hidden rounded-ctl border-2 border-ink">
       {["image", "video"].includes(a.kind) ? (
-        <div className="aspect-video bg-black">
+        <div className="aspect-video bg-ink">
           <AssetPreview asset={a} />
         </div>
       ) : a.kind === "audio" ? (
@@ -607,10 +703,10 @@ function OutputAsset({ id }: { id: string }) {
           <AssetPreview asset={a} />
         </div>
       ) : null}
-      <div className="flex items-center justify-between px-2 py-1 text-[10px] text-muted">
+      <div className="flex items-center justify-between gap-2 border-t-2 border-ink px-2 py-1.5 text-[12px] text-muted">
         <span className="truncate">{a.label}</span>
-        <a href={`/api/assets/${id}/file?download=1`} className="shrink-0 hover:text-fg">
-          download
+        <a href={`/api/assets/${id}/file?download=1`} className="inline-flex shrink-0 items-center gap-1 font-semibold text-ink underline decoration-accent decoration-2 underline-offset-2 hover:decoration-ink">
+          <Download className="size-3.5" aria-hidden /> Download
         </a>
       </div>
     </div>
@@ -630,10 +726,10 @@ function NodeLog({ nodeRunId }: { nodeRunId: string }) {
   if (!lines.length) return null;
   return (
     <div>
-      <div className="mb-1 text-[10px] font-semibold uppercase tracking-wider text-faint">Live log</div>
-      <div className="max-h-40 overflow-y-auto rounded bg-bg p-2 font-mono text-[10px] leading-relaxed">
+      <div className="nb-label mb-1.5 text-faint">Live log</div>
+      <div className="on-ink max-h-40 overflow-y-auto rounded-ctl border-2 border-ink bg-ink p-2 font-mono text-[12px] leading-relaxed">
         {lines.map((l) => (
-          <div key={l.id} className={l.level === "error" ? "text-err" : l.level === "warn" ? "text-warn" : "text-muted"}>
+          <div key={l.id} className={l.level === "error" ? "text-coral" : l.level === "warn" ? "text-accent" : "text-cream/80"}>
             {new Date(l.ts).toLocaleTimeString()} {l.message}
           </div>
         ))}
@@ -643,9 +739,15 @@ function NodeLog({ nodeRunId }: { nodeRunId: string }) {
 }
 
 function BottomPanel({ tab, setTab, issues, runId, onPick }: { tab: "issues" | "log"; setTab: (t: "issues" | "log") => void; issues: ValidationIssue[]; runId: string | null; onPick: (id: string) => void }) {
+  // Collapsed by default on phones so the canvas keeps its height.
   const [open, setOpen] = useState(true);
+  useEffect(() => {
+    if (window.matchMedia("(max-width: 767px)").matches) setOpen(false);
+  }, []);
   const [log, setLog] = useState<OrkEvent[]>([]);
-  useEffect(() => setLog([]), [runId]);
+  useEffect(() => {
+    setLog([]);
+  }, [runId]);
   useEvents(
     useCallback(
       (e: OrkEvent) => {
@@ -655,28 +757,33 @@ function BottomPanel({ tab, setTab, issues, runId, onPick }: { tab: "issues" | "
     ),
   );
   return (
-    <div className={cn("shrink-0 border-t border-line bg-panel", open ? "h-40" : "h-8")}>
-      <div className="flex h-8 items-center gap-1 px-2">
-        {(["issues", "log"] as const).map((t) => (
-          <button key={t} onClick={() => (setTab(t), setOpen(true))} className={cn("rounded px-2 py-0.5 text-[11px]", tab === t && open ? "bg-panel-2 text-fg" : "text-muted hover:text-fg")}>
-            {t === "issues" ? `Validation (${issues.length})` : `Run log (${log.length})`}
-          </button>
-        ))}
-        <button onClick={() => setOpen(!open)} className="ml-auto text-[11px] text-faint hover:text-fg">
-          {open ? "hide" : "show"}
-        </button>
+    <div className={cn("shrink-0 border-t-2 border-ink bg-panel", open ? "h-44" : "h-11")}>
+      <div className="flex h-11 items-center gap-1 px-2">
+        <Tabs
+          className="p-0"
+          value={tab}
+          onChange={(t) => (setTab(t), setOpen(true))}
+          tabs={[
+            { value: "issues", label: `Validation (${issues.length})` },
+            { value: "log", label: `Run log (${log.length})` },
+          ]}
+        />
+        <IconButton label={open ? "Hide panel" : "Show panel"} aria-expanded={open} className="ml-auto size-8" onClick={() => setOpen(!open)}>
+          {open ? <ChevronDown className="size-4" /> : <ChevronUp className="size-4" />}
+        </IconButton>
       </div>
       {open && (
-        <div className="h-32 overflow-y-auto px-3 pb-2 font-mono text-[11px]">
+        <div className="h-[132px] overflow-y-auto px-3 pb-2 font-mono text-[12px] leading-relaxed">
           {tab === "issues" ? (
             issues.length ? (
               issues.map((i, k) => (
-                <button key={k} onClick={() => i.nodeId && onPick(i.nodeId)} className={cn("block w-full text-left", i.level === "error" ? "text-err" : "text-warn")}>
-                  [{i.code}] {i.message}
+                <button key={k} type="button" onClick={() => i.nodeId && onPick(i.nodeId)} className={cn("flex w-full gap-2 rounded-sm px-1 text-left hover:bg-panel-2", i.level === "error" ? "text-err" : "text-warn")}>
+                  <span className="shrink-0 font-semibold">{i.level === "error" ? "✕" : "!"} [{i.code}]</span>
+                  <span className="min-w-0">{i.message}</span>
                 </button>
               ))
             ) : (
-              <div className="text-ok">Graph is valid.</div>
+              <div className="text-ok">✓ Graph is valid.</div>
             )
           ) : log.length ? (
             log.map((l) => (

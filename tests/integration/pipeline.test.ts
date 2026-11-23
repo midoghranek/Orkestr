@@ -32,7 +32,7 @@ beforeAll(async () => {
   // A local page to capture (Playwright only accepts http(s)).
   server = http.createServer((_req, res) => {
     res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
-    res.end(`<!doctype html><html dir="rtl"><body style="margin:0;font:48px sans-serif;background:#1A3324;color:#F7F1E8;display:grid;place-items:center;height:100vh">كافيهك تحت سيطرتك</body></html>`);
+    res.end(`<!doctype html><html dir="rtl"><body style="margin:0;font:48px sans-serif;background:#17140F;color:#F4EFE4;display:grid;place-items:center;height:100vh">صباحك على مزاجك</body></html>`);
   });
   await new Promise<void>((r) => server.listen(0, "127.0.0.1", () => r()));
   const a = server.address();
@@ -87,7 +87,7 @@ describe("real end-to-end workflow", () => {
         { id: "still", type: "video.still", params: { durationS: 2, aspect: "16:9", fps: 30 }, position: { x: 0, y: 0 } },
         { id: "enc", type: "video.encode", params: { aspect: "16:9", fps: 30, crf: 28, audio: false }, position: { x: 0, y: 0 } },
         { id: "qa", type: "production.qa", params: { expectWidth: 1920, expectHeight: 1080, expectFps: 30, minDurationS: 1.9, maxDurationS: 2.1, requireAudio: false, frames: 2 }, position: { x: 0, y: 0 } },
-        { id: "poster", type: "image.poster", params: { aspect: "4:5", headline: "كافيهك تحت سيطرتك", sub: "integration test" }, position: { x: 0, y: 0 } },
+        { id: "poster", type: "image.poster", params: { aspect: "4:5", headline: "صباحك على مزاجك", sub: "integration test" }, position: { x: 0, y: 0 } },
         { id: "export", type: "production.export", params: { name: "it-clip" }, position: { x: 0, y: 0 } },
       ],
       edges: [
@@ -154,6 +154,6 @@ describe("speech", () => {
     const { FilmCraftAdapter } = await import("@/server/adapters/craft");
     const a = new FilmCraftAdapter();
     await a.discover();
-    await expect(a.execute("tts", { text: "كافيهك تحت سيطرتك" }, { signal: new AbortController().signal, workDir: process.env.ORKESTR_DATA_DIR!, projectId: "t", runId: "t", nodeRunId: "t", progress: () => undefined, log: () => undefined })).rejects.toMatchObject({ code: "UNSUPPORTED" });
+    await expect(a.execute("tts", { text: "صباحك على مزاجك" }, { signal: new AbortController().signal, workDir: process.env.ORKESTR_DATA_DIR!, projectId: "t", runId: "t", nodeRunId: "t", progress: () => undefined, log: () => undefined })).rejects.toMatchObject({ code: "UNSUPPORTED" });
   });
 });

@@ -35,9 +35,9 @@ export function ParamsForm({ schema, value, onChange }: { schema: JsonSchema; va
     onChange(next);
   };
   const keys = Object.keys(props);
-  if (!keys.length) return <div className="text-xs text-faint">No parameters.</div>;
+  if (!keys.length) return <div className="text-[13px] text-faint">No parameters.</div>;
   return (
-    <div className="space-y-3">
+    <div className="space-y-4">
       {keys.map((k) => {
         const s = props[k];
         const t = baseType(s);
@@ -52,8 +52,8 @@ export function ParamsForm({ schema, value, onChange }: { schema: JsonSchema; va
           );
         if (t === "boolean")
           return (
-            <label key={k} className="flex items-center gap-2 text-xs text-muted">
-              <input type="checkbox" checked={v === undefined ? !!s.default : !!v} onChange={(e) => set(k, e.target.checked)} className="accent-[var(--color-accent)]" />
+            <label key={k} className="flex min-h-10 cursor-pointer items-center gap-3 rounded-ctl border-2 border-ink bg-white/70 px-3 py-1.5 text-[14px] font-medium text-ink">
+              <input type="checkbox" checked={v === undefined ? !!s.default : !!v} onChange={(e) => set(k, e.target.checked)} className="size-5 shrink-0 cursor-pointer accent-[var(--color-ink)]" />
               {label}
             </label>
           );
@@ -92,10 +92,10 @@ function JsonField({ label, value, onChange }: { label: string; value: unknown; 
     setText(value === undefined ? "" : JSON.stringify(value, null, 2));
   }, [value]);
   return (
-    <Field label={`${label} (JSON)`} hint={err ? <span className="text-err">{err}</span> : undefined}>
+    <Field label={`${label} (JSON)`} hint={err ? <span role="alert" className="font-semibold text-err">{err}</span> : undefined}>
       <textarea
         dir="auto"
-        className={`${inputCls} min-h-28 font-mono text-[11px]`}
+        className={`${inputCls} min-h-28 resize-y font-mono text-[12px] leading-relaxed`}
         value={text}
         onChange={(e) => setText(e.target.value)}
         onBlur={() => {

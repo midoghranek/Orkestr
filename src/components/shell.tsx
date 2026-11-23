@@ -2,50 +2,124 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Clapperboard, Gauge, ListVideo, Settings, Workflow } from "lucide-react";
-import { cn, Toaster } from "./ui";
+import { Clapperboard, LayoutDashboard, ListVideo, Settings } from "lucide-react";
+import { cn, Logo, Toaster } from "./ui";
 import { useApi, type OrkEvent } from "@/lib/api";
 
 const NAV = [
-  { href: "/", label: "Dashboard", icon: Gauge, match: (p: string) => p === "/" },
-  { href: "/projects", label: "Projects", icon: Clapperboard, match: (p: string) => p.startsWith("/projects") },
-  { href: "/queue", label: "Render Queue", icon: ListVideo, match: (p: string) => p.startsWith("/queue") },
-  { href: "/settings", label: "Settings", icon: Settings, match: (p: string) => p.startsWith("/settings") },
+  { href: "/", label: "Dashboard", short: "Home", icon: LayoutDashboard, match: (p: string) => p === "/" },
+  { href: "/projects", label: "Projects", short: "Projects", icon: Clapperboard, match: (p: string) => p.startsWith("/projects") },
+  { href: "/queue", label: "Render Queue", short: "Queue", icon: ListVideo, match: (p: string) => p.startsWith("/queue") },
+  { href: "/settings", label: "Settings", short: "Settings", icon: Settings, match: (p: string) => p.startsWith("/settings") },
 ];
 
 const onApproval = (e: OrkEvent) => e.type.startsWith("approval") || e.type.startsWith("node.") || e.type.startsWith("run.");
+
+function WorkerDot({ alive }: { alive: boolean | undefined }) {
+  return (
+    <span className="relative flex size-2.5 shrink-0" aria-hidden>
+      {alive && <span className="absolute inset-0 animate-ping rounded-full bg-mint opacity-60" />}
+      <span className={cn("relative size-2.5 rounded-full border border-cream/40", alive === undefined ? "bg-faint" : alive ? "bg-mint" : "bg-coral")} />
+    </span>
+  );
+}
 
 export function Shell({ children }: { children: React.ReactNode }) {
   const path = usePathname() ?? "/";
   const { data: sys } = useApi<{ worker: { alive: boolean } }>("/api/system", { refreshMs: 10_000 });
   const { data: pending } = useApi<unknown[]>("/api/approvals?status=pending", { events: onApproval, refreshMs: 15_000 });
+  const alive = sys?.worker.alive;
+  const workerText = sys === undefined ? "Checking worker…" : alive ? "Worker running" : "Worker offline";
+  const count = pending?.length ?? 0;
+
   return (
-    <div className="flex h-screen overflow-hidden">
-      <aside className="flex w-52 shrink-0 flex-col border-r border-line bg-panel">
-        <Link href="/" className="flex items-center gap-2 px-4 py-4">
-          <span className="flex size-7 items-center justify-center rounded-md bg-accent text-accent-fg">
-            <Workflow className="size-4" />
-          </span>
-          <span className="text-[15px] font-semibold tracking-tight">Orkestr</span>
+    <div className="flex h-dvh flex-col overflow-hidden md:flex-row">
+      <a href="#main" className="sr-only z-[70] rounded-ctl border-2 border-ink bg-accent px-3 py-2 font-semibold focus:not-sr-only focus:fixed focus:left-3 focus:top-3">
+        Skip to content
+      </a>
+
+      {/* Desktop / tablet rail */}
+      <aside className="on-ink hidden w-60 shrink-0 flex-col bg-ink text-cream md:flex">
+        <Link href="/" className="flex items-center gap-2.5 px-5 pb-6 pt-5">
+          <Logo className="size-9" />
+          <span className="font-display text-[22px] font-extrabold tracking-[-0.03em]">Orkestr</span>
         </Link>
-        <nav className="flex flex-col gap-0.5 px-2">
-          {NAV.map((n) => (
-            <Link key={n.href} href={n.href} className={cn("flex items-center gap-2.5 rounded-md px-2.5 py-1.5 text-[13px] transition-colors", n.match(path) ? "bg-panel-2 text-fg" : "text-muted hover:bg-panel-2/60 hover:text-fg")}>
-              <n.icon className="size-4" />
-              <span className="flex-1">{n.label}</span>
-              {n.href === "/queue" && !!pending?.length && <span className="rounded bg-accent px-1.5 text-[10px] font-semibold text-accent-fg">{pending.length}</span>}
-            </Link>
-          ))}
+        <div className="nb-label px-5 pb-2 text-cream/55">Studio</div>
+        <nav className="flex flex-col gap-1 px-3" aria-label="Main">
+          {NAV.map((n) => {
+            const on = n.match(path);
+            return (
+              <Link
+                key={n.href}
+                href={n.href}
+                aria-current={on ? "page" : undefined}
+                className={cn(
+                  "group flex h-11 items-center gap-3 rounded-ctl border-2 px-3 text-[14px] font-semibold transition-[background-color,transform] duration-100",
+                  on ? "border-ink bg-accent text-ink shadow-[3px_3px_0_0_var(--color-cream)]" : "border-transparent text-cream/80 hover:bg-ink-2 hover:text-cream",
+                )}
+              >
+                <n.icon className="size-[18px]" aria-hidden />
+                <span className="flex-1">{n.label}</span>
+                {n.href === "/queue" && count > 0 && (
+                  <span className={cn("min-w-6 rounded-full border-2 px-1.5 text-center font-mono text-[11px] font-bold leading-5", on ? "border-ink bg-ink text-accent" : "border-ink bg-accent text-ink")} aria-label={`${count} waiting for approval`}>
+                    {count}
+                  </span>
+                )}
+              </Link>
+            );
+          })}
         </nav>
-        <div className="mt-auto border-t border-line px-4 py-3 text-[11px] text-faint">
-          <div className="flex items-center gap-1.5">
-            <span className={cn("size-1.5 rounded-full", sys === undefined ? "bg-faint" : sys.worker.alive ? "bg-ok" : "bg-err")} />
-            {sys === undefined ? "checking worker…" : sys.worker.alive ? "worker running" : "worker offline — run npm run dev"}
+        <div className="mt-auto p-3">
+          <div className={cn("rounded-ctl border-2 p-3 text-[12px]", alive === false ? "border-coral bg-coral/15" : "border-cream/15")}>
+            <div className="flex items-center gap-2 font-semibold">
+              <WorkerDot alive={alive} />
+              {workerText}
+            </div>
+            {alive === false && (
+              <div className="mt-1.5 leading-snug text-cream/80">
+                Jobs won&apos;t run. Start it with <code className="rounded bg-ink-2 px-1 font-mono text-accent">npm run dev</code>
+              </div>
+            )}
+            <div className="nb-label mt-2 text-cream/50">127.0.0.1 · local only</div>
           </div>
-          <div className="mt-1">127.0.0.1 · local only</div>
         </div>
       </aside>
-      <main className="min-w-0 flex-1 overflow-y-auto">{children}</main>
+
+      {/* Phone top bar */}
+      <header className="on-ink flex h-14 shrink-0 items-center gap-2 border-b-2 border-ink bg-ink px-4 text-cream md:hidden">
+        <Link href="/" className="flex items-center gap-2">
+          <Logo className="size-8" />
+          <span className="font-display text-[19px] font-extrabold tracking-[-0.03em]">Orkestr</span>
+        </Link>
+        <span className="ml-auto flex items-center gap-2 text-[12px] font-semibold" role="status">
+          <WorkerDot alive={alive} />
+          <span className={alive === false ? "text-coral" : "text-cream/80"}>{workerText.replace("Worker ", "")}</span>
+        </span>
+      </header>
+
+      <main id="main" className="min-h-0 min-w-0 flex-1 overflow-y-auto pb-20 md:pb-0">
+        {children}
+      </main>
+
+      {/* Phone bottom tab bar */}
+      <nav className="on-ink fixed inset-x-0 bottom-0 z-30 grid grid-cols-4 border-t-2 border-ink bg-ink pb-[env(safe-area-inset-bottom)] md:hidden" aria-label="Main">
+        {NAV.map((n) => {
+          const on = n.match(path);
+          return (
+            <Link key={n.href} href={n.href} aria-current={on ? "page" : undefined} className="flex h-16 flex-col items-center justify-center gap-1 text-[11px] font-semibold">
+              <span className={cn("relative flex h-8 w-12 items-center justify-center rounded-full border-2 transition-colors", on ? "border-cream bg-accent text-ink" : "border-transparent text-cream/75")}>
+                <n.icon className="size-5" aria-hidden />
+                {n.href === "/queue" && count > 0 && (
+                  <span className="absolute -right-1.5 -top-1.5 min-w-5 rounded-full border-2 border-ink bg-coral px-1 text-center font-mono text-[10px] font-bold leading-4 text-ink" aria-label={`${count} waiting`}>
+                    {count}
+                  </span>
+                )}
+              </span>
+              <span className={on ? "text-accent" : "text-cream/75"}>{n.short}</span>
+            </Link>
+          );
+        })}
+      </nav>
       <Toaster />
     </div>
   );
