@@ -64,19 +64,19 @@ Operates the Orkestr AI Director over the local HTTP API (`http://127.0.0.1:4317
 ## Examples
 Create plan (PowerShell-safe, JSON from a file):
 ```
-curl.exe -s -H "Content-Type: application/json" -d "{\"brief\":\"30 s 16:9 Egyptian Arabic commercial for the kafeeh POS ...\"}" http://127.0.0.1:4317/api/projects/kafeeh/plans
+curl.exe -s -H "Content-Type: application/json" -d "{\"brief\":\"20 s 16:9 spot for the fictional Acme Café demo brand ...\"}" http://127.0.0.1:4317/api/projects/acme-cafe/plans
 curl.exe -s http://127.0.0.1:4317/api/plans/pln_xxxx
 ```
-Accept body (kafeeh-style, no paid voiceover yet; ids come from `GET /api/assets`):
+Accept body (acme-cafe demo style, no paid voiceover; ids come from `GET /api/assets`):
 ```json
 {
   "imagePool": ["ast_photo1", "ast_photo2", "ast_photo3", "ast_photo4"],
   "logoAssetId": "ast_logo_light",
   "logoReversedAssetId": "ast_logo_dark",
   "voiceover": { "kind": "none" },
-  "whisperLanguage": "ar",
-  "direction": "rtl",
-  "palette": { "bg": "#F7F1E8", "fg": "#22412D", "accent": "#C97A55", "accent2": "#4F7D5A", "surface": "#1A3324", "onSurface": "#F7F1E8" }
+  "whisperLanguage": "en",
+  "direction": "ltr",
+  "palette": { "bg": "#F4EFE4", "fg": "#17140F", "accent": "#FFD23F", "accent2": "#8C6CFF", "surface": "#17140F", "onSurface": "#F4EFE4" }
 }
 ```
 With paid VO: `"voiceover": {"kind":"elevenlabs","voiceId":"<from elevenlabs.voices>","modelId":"eleven_multilingual_v2","languageCode":"ar"}` (adds a paid node + approval gates; see `audio-production`). Existing take: `{"kind":"asset","assetId":"ast_..."}`. `musicAssetId` must be a licensed imported track.

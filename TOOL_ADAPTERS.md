@@ -25,11 +25,11 @@ timeouts, output caps, redacted stderr. Only binaries registered by discovery ca
 | Adapter | Version | Operations (verified how) | Notes |
 | --- | --- | --- | --- |
 | `ffmpeg` | 4.3.1 essentials | probe, encode, concat, mux, subtitles, frames, still, loudnorm, loop, poster — `-version`, `-encoders`, lavfi smoke encode | libx264, aac, libvpx-vp9 present |
-| `remotion` | 4.0.545 | render (H.264, AAC track always present), still — TestCard smoke render, kafeeh renders | Output is converted to limited-range `yuv420p` (Remotion tags JPEG-frame encodes `yuvj420p`) |
+| `remotion` | 4.0.545 | render (H.264, AAC track always present), still — TestCard smoke render, demo renders | Output is converted to limited-range `yuv420p` (Remotion tags JPEG-frame encodes `yuvj420p`) |
 | `whisper` | whisper.cpp 1.5.5 | transcribe → word JSON + SRT — transcribed a FilmCraft TTS clip | Installed to `data/tools/whisper.cpp` (Remotion's Windows build); models from Hugging Face |
-| `playwright` | 1.65.1 | screenshot, record — Chromium launch at health check, live kafeeh captures | http(s) only, downloads disabled |
+| `playwright` | 1.65.1 | screenshot, record — Chromium launch at health check, live page captures | http(s) only, downloads disabled |
 | `claude` | Claude Code 2.1.330 | plan, write, review — `claude -p --json-schema` smoke call returned `structured_output` + `total_cost_usd` | `--tools ""`, no MCP, no session persistence |
-| `photocraft` | 0.23.1 | info, convert, grade (imageSize, photoFilter, vibrance, unsharpMask) — `run` on a brand photo | commands mirror the CafeOS brand build |
+| `photocraft` | 0.23.1 | info, convert, grade (imageSize, photoFilter, vibrance, unsharpMask) — `run` on a brand photo | commands mirror a typical brand asset build |
 | `filmcraft` | 0.20.1 | probe, **tts (en-US only)** — built-in voice narration exported to WAV | `transcribe` blocked: *“speech-to-text is not available in this build (built without the `whisper` feature)”* — verified by running `sequence.transcribe` |
 | `soundcraft` | 0.20.1 | info, convert (resample, bit depth, peak normalize) | **no TTS** in its 483-command registry |
 | `effectcraft` | 0.24.1 | render (project/template), renderFrame — rendered its default comp | project/template must be under an import folder |

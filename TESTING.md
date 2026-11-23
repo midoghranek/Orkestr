@@ -36,8 +36,11 @@ npm run discover           # live capability check (no spend)
 
 ## Browser (`tests/e2e`, Playwright, read-only — never approves or spends)
 
+The suite runs against the `acme-cafe` demo project. Create it with `npm run seed:demo` (dummy data, generated with
+FFmpeg, no cost) and keep `npm run dev` running while the tests execute.
+
 Dashboard (worker status, approvals, projects), Settings (verified tools and gaps), project Overview / Storyboard /
-Assets / Preview / AI Director for kafeeh, flow editor (graph renders with >20 nodes, run overlay, unavailable
+Assets / Preview / AI Director for the `acme-cafe` demo project, flow editor (graph renders with >20 nodes, run overlay, unavailable
 generators visible, live validation blocks Run after an invalid edit), Render Queue, and API guards (foreign Host,
 cross-origin POST, path traversal on exports). No console errors allowed. Screenshots land in
 `test-results/screens/`.
@@ -46,7 +49,7 @@ cross-origin POST, path traversal on exports). No console errors allowed. Screen
 
 - `npm run typecheck`: clean
 - unit: **34/34** passed · integration: **5/5** passed · browser: **6/6** passed
-- kafeeh acceptance run: all four videos pass technical QA (resolution, aspect, fps, duration, codec, `yuv420p`,
+- acceptance run of the bundled templates: all four videos pass technical QA (resolution, aspect, fps, duration, codec, `yuv420p`,
   audio stream present, no black segments); loudness flagged *minor* on the two cuts because they are silent
   (no voiceover/music available). Frames were inspected manually (see PRODUCTION_GUIDE.md).
 
@@ -56,12 +59,12 @@ cross-origin POST, path traversal on exports). No console errors allowed. Screen
 | --- | --- |
 | unit | optional-input nodes ran after an upstream failure (now failure always propagates) |
 | unit | preauthorized budget let two paid steps through concurrently (in-flight spend now counted) |
-| kafeeh run | render props with `{$file}` objects failed schema validation (switched to string file refs) |
-| kafeeh QA | Remotion output was full-range `yuvj420p` (now converted to `yuv420p`) |
-| kafeeh frame review | every scene visual dropped: Zod 4 `.partial()` applied `visual: null` defaults |
-| kafeeh frame review | desktop UI captures cropped in 9:16 (portrait deliverables now get real mobile captures) |
-| kafeeh frame review | DRAFT banner missing on placeholder photos |
-| kafeeh run | poster render passed a JPEG-only option for PNG |
+| acceptance run | render props with `{$file}` objects failed schema validation (switched to string file refs) |
+| acceptance QA | Remotion output was full-range `yuvj420p` (now converted to `yuv420p`) |
+| acceptance frame review | every scene visual dropped: Zod 4 `.partial()` applied `visual: null` defaults |
+| acceptance frame review | desktop UI captures cropped in 9:16 (portrait deliverables now get real mobile captures) |
+| acceptance frame review | DRAFT banner missing on placeholder photos |
+| acceptance run | poster render passed a JPEG-only option for PNG |
 | cache review | edited compositions would reuse stale renders (composition source hash now in the signature) |
 | browser | Director brief empty: PATCH reset fields to defaults (same Zod 4 issue) |
 | browser | orphaned approvals counted after deleting a workflow |

@@ -2,19 +2,21 @@
 
 import Link from "next/link";
 import { useParams, usePathname } from "next/navigation";
-import { useCallback, useRef } from "react";
+import { useCallback, useEffect, useRef } from "react";
+import { ChevronRight, Clapperboard, FolderOpen, LayoutGrid, MonitorPlay, Sparkles, Workflow } from "lucide-react";
 import type { OrkEvent } from "@/lib/api";
-import { cn } from "@/components/ui";
+import { cn, ErrorNote, Skeleton } from "@/components/ui";
 import { useApi } from "@/lib/api";
 import { ProjectContext, type Overview } from "@/components/project-context";
 
+// Tabs follow the production order: plan → board → build → collect → review.
 const TABS = [
-  { seg: "", label: "Overview" },
-  { seg: "director", label: "AI Director" },
-  { seg: "storyboard", label: "Storyboard" },
-  { seg: "flows", label: "Flows" },
-  { seg: "assets", label: "Assets" },
-  { seg: "preview", label: "Preview" },
+  { seg: "", label: "Overview", icon: LayoutGrid },
+  { seg: "director", label: "AI Director", icon: Sparkles },
+  { seg: "storyboard", label: "Storyboard", icon: Clapperboard },
+  { seg: "flows", label: "Flows", icon: Workflow },
+  { seg: "assets", label: "Assets", icon: FolderOpen },
+  { seg: "preview", label: "Preview", icon: MonitorPlay },
 ];
 
 export default function ProjectLayout({ children }: { children: React.ReactNode }) {
@@ -26,35 +28,72 @@ export default function ProjectLayout({ children }: { children: React.ReactNode 
   pidRef.current = ov.data?.project.id;
   const base = `/projects/${id}`;
   const active = path === base ? "" : path.slice(base.length + 1).split("/")[0];
+  const activeRef = useRef<HTMLAnchorElement>(null);
+  // On phones the tab strip scrolls; keep the current section in view.
+  useEffect(() => {
+    activeRef.current?.scrollIntoView({ block: "nearest", inline: "center" });
+  }, [active]);
+  const inEditor = active === "flows" && path.split("/").length > 4;
   return (
     <ProjectContext.Provider value={ov}>
       <div className="flex min-h-full flex-col">
-        <div className="border-b border-line bg-panel/60 px-6 pt-4">
-          <div className="flex items-center gap-2 text-xs text-faint">
-            <Link href="/projects" className="hover:text-fg">
+        <div className={cn("border-b-2 border-ink bg-panel px-4 sm:px-6 lg:px-8", inEditor ? "pt-3" : "pt-5")}>
+          <nav aria-label="Breadcrumb" className="flex items-center gap-1 text-[12px] font-semibold text-muted">
+            <Link href="/projects" className="rounded-sm underline-offset-4 hover:text-ink hover:underline">
               Projects
             </Link>
-            <span>/</span>
-            <span className="text-muted">{ov.data?.project.name ?? "…"}</span>
-          </div>
-          <div className="mt-1 flex items-baseline gap-3">
-            <h1 className="text-lg font-semibold tracking-tight">{ov.data?.project.name ?? " "}</h1>
-            {ov.data && <span className="truncate text-xs text-muted">{ov.data.project.description}</span>}
-          </div>
-          <nav className="mt-3 flex gap-0.5">
-            {TABS.map((t) => (
-              <Link
-                key={t.seg}
-                href={t.seg ? `${base}/${t.seg}` : base}
-                className={cn("-mb-px border-b-2 px-3 py-2 text-[13px]", active === t.seg ? "border-accent text-fg" : "border-transparent text-muted hover:text-fg")}
-              >
-                {t.label}
-                {t.seg === "" && !!ov.data?.approvals.length && <span className="ml-1.5 rounded bg-accent px-1 text-[10px] font-semibold text-accent-fg">{ov.data.approvals.length}</span>}
-              </Link>
-            ))}
+            <ChevronRight className="size-3.5" aria-hidden />
+            <span className="truncate text-ink" aria-current="page">
+              {ov.data?.project.name ?? "…"}
+            </span>
+          </nav>
+          {!inEditor && (
+            <div className="mt-1.5 flex flex-wrap items-baseline gap-x-4 gap-y-1">
+              {ov.data ? (
+                <h1 className="font-display text-[30px] font-extrabold leading-none tracking-[-0.03em] sm:text-[36px]">{ov.data.project.name}</h1>
+              ) : (
+                <Skeleton className="h-9 w-64" />
+              )}
+              {ov.data?.project.description && (
+                <p className="min-w-0 max-w-2xl truncate text-[14px] text-muted" dir="auto">
+                  {ov.data.project.description}
+                </p>
+              )}
+            </div>
+          )}
+          <nav className={cn("-mx-4 flex gap-1 overflow-x-auto px-4 sm:mx-0 sm:px-0", inEditor ? "mt-2" : "mt-4")} aria-label="Project sections">
+            {TABS.map((t) => {
+              const on = active === t.seg;
+              return (
+                <Link
+                  key={t.seg}
+                  ref={on ? activeRef : undefined}
+                  href={t.seg ? `${base}/${t.seg}` : base}
+                  aria-current={on ? "page" : undefined}
+                  className={cn(
+                    "relative -mb-[2px] flex h-11 shrink-0 items-center gap-2 rounded-t-ctl border-2 border-b-0 px-3.5 text-[14px] font-semibold transition-colors",
+                    on ? "border-ink bg-bg text-ink after:absolute after:inset-x-0 after:-bottom-[2px] after:h-[2px] after:bg-bg" : "border-transparent text-muted hover:bg-panel-2 hover:text-ink",
+                  )}
+                >
+                  <t.icon className={cn("size-4", on && "text-ink")} aria-hidden />
+                  {t.label}
+                  {t.seg === "" && !!ov.data?.approvals.length && (
+                    <span className="min-w-5 rounded-full border-2 border-ink bg-accent px-1 text-center font-mono text-[10px] font-bold leading-4" aria-label={`${ov.data.approvals.length} waiting for approval`}>
+                      {ov.data.approvals.length}
+                    </span>
+                  )}
+                </Link>
+              );
+            })}
           </nav>
         </div>
-        {ov.error && !ov.data ? <div className="p-6 text-sm text-err">{ov.error}</div> : <div className="min-h-0 flex-1">{children}</div>}
+        {ov.error && !ov.data ? (
+          <div className="p-6">
+            <ErrorNote>{ov.error}</ErrorNote>
+          </div>
+        ) : (
+          <div className="flex min-h-0 flex-[1_1_0px] flex-col">{children}</div>
+        )}
       </div>
     </ProjectContext.Provider>
   );

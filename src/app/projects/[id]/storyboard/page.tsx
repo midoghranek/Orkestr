@@ -5,7 +5,8 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { useParams } from "next/navigation";
 import { api, ago, useApi } from "@/lib/api";
 import { useProject, type AssetFull, type SceneLite } from "@/components/project-context";
-import { AssetPreview, Button, Card, Empty, ErrorNote, Field, Input, Notice, Pill, Spinner, StatusBadge, Textarea, toast, cn } from "@/components/ui";
+import { X } from "lucide-react";
+import { AssetPreview, Button, Card, CardHeader, Empty, ErrorNote, Field, IconButton, Input, LoadingRows, Notice, Pill, Sheet, Skeleton, Spinner, StatusBadge, Textarea, btnCls, toast, cn } from "@/components/ui";
 
 const EDIT_FIELDS = ["title", "durationS", "narration", "onScreenText", "camera", "prompt", "notes"] as const;
 type EditField = (typeof EDIT_FIELDS)[number];
@@ -23,15 +24,15 @@ function visualTone(v: string): { tone: "warn" | "ok" | "info"; flagged: boolean
 function SceneThumb({ id }: { id: string | null }) {
   const { data, error } = useApi<{ asset: AssetFull }>(id ? `/api/assets/${id}` : null);
   return (
-    <div className="aspect-video w-full overflow-hidden rounded-md border border-line bg-black">
+    <div className="aspect-video w-full overflow-hidden rounded-ctl border-2 border-ink bg-ink">
       {!id ? (
-        <div className="flex h-full items-center justify-center text-[11px] text-faint">No visual selected</div>
+        <div className="nb-label flex h-full items-center justify-center text-cream/80">No visual selected</div>
       ) : data ? (
         <AssetPreview asset={data.asset} controls={false} />
       ) : error ? (
-        <div className="flex h-full items-center justify-center text-[11px] text-err">asset unavailable</div>
+        <div className="nb-label flex h-full items-center justify-center text-cream">asset unavailable</div>
       ) : (
-        <div className="flex h-full items-center justify-center text-faint">
+        <div className="flex h-full items-center justify-center text-cream">
           <Spinner />
         </div>
       )}
@@ -43,35 +44,39 @@ function VersionDrawer({ scene, onClose, onUse }: { scene: SceneLite; onClose: (
   const { data, error, loading } = useApi<{ scene: SceneLite; versions: AssetFull[] }>(`/api/scenes/${scene.id}`);
   const [busy, setBusy] = useState<string | null>(null);
   return (
-    <div className="fixed inset-y-0 right-0 z-40 flex w-full max-w-md flex-col border-l border-line-strong bg-panel shadow-2xl">
-      <div className="flex items-center justify-between border-b border-line px-4 py-3">
-        <div className="min-w-0">
-          <div className="text-[13px] font-semibold">Version history</div>
-          <div className="truncate text-xs text-muted">
-            Scene {scene.idx + 1} · {scene.title}
-          </div>
-        </div>
-        <Button size="sm" variant="ghost" onClick={onClose}>
-          Close
-        </Button>
-      </div>
+    <Sheet onClose={onClose} label="Version history">
+      <CardHeader
+        className="bg-panel-2"
+        eyebrow={`Scene ${scene.idx + 1}`}
+        title="Version history"
+        sub={
+          <span className="block truncate" dir="auto">
+            {scene.title}
+          </span>
+        }
+        actions={
+          <IconButton label="Close" onClick={onClose}>
+            <X className="size-5" />
+          </IconButton>
+        }
+      />
       <div className="min-h-0 flex-1 space-y-3 overflow-y-auto p-4">
-        {loading && <Spinner />}
+        {loading && <LoadingRows rows={3} className="p-0" />}
         {error && <ErrorNote>{error}</ErrorNote>}
         {data && !data.versions.length && <Empty title="No versions yet">Assets produced for this scene by a workflow run will appear here.</Empty>}
         {data?.versions.map((a) => {
           const selected = a.id === scene.selectedAssetId;
           return (
-            <div key={a.id} className={cn("rounded-md border p-2", selected ? "border-accent/60 bg-accent/5" : "border-line")}>
-              <div className="aspect-video overflow-hidden rounded bg-black">
+            <div key={a.id} className={cn("rounded-ctl border-2 border-ink p-2", selected ? "bg-accent/25 shadow-brut-xs" : "bg-panel")}>
+              <div className="aspect-video overflow-hidden rounded-ctl border-2 border-ink bg-ink">
                 <AssetPreview asset={a} controls={false} />
               </div>
               <div className="mt-2 flex items-center justify-between gap-2">
-                <div className="min-w-0 text-xs">
-                  <div className="truncate font-medium text-fg">
-                    v{a.version} · {a.label}
+                <div className="min-w-0 text-[13px]">
+                  <div className="truncate font-semibold text-ink" title={a.label}>
+                    <span className="font-mono">v{a.version}</span> · {a.label}
                   </div>
-                  <div className="text-faint">
+                  <div className="text-[12px] text-faint">
                     {a.kind} · {ago(a.createdAt)}
                   </div>
                 </div>
@@ -98,11 +103,11 @@ function VersionDrawer({ scene, onClose, onUse }: { scene: SceneLite; onClose: (
           );
         })}
       </div>
-    </div>
+    </Sheet>
   );
 }
 
-const LBL = "text-[10px] font-medium uppercase tracking-wide text-faint";
+const LBL = "nb-label text-faint";
 
 function SceneCard({
   scene,
@@ -174,22 +179,29 @@ function SceneCard({
       : "No run for this project has a workflow node with this scene's id. Run a workflow generated from the storyboard first.";
 
   return (
-    <Card className="flex flex-col">
-      <div className="flex items-center justify-between gap-2 border-b border-line px-3 py-2">
-        <div className="flex min-w-0 items-center gap-2">
-          <span className="flex size-6 shrink-0 items-center justify-center rounded bg-panel-2 text-xs font-semibold text-muted">{scene.idx + 1}</span>
-          <span className="truncate text-[13px] font-semibold" dir="auto">
+    <Card className="flex min-w-0 flex-col overflow-hidden">
+      <div className="flex items-stretch gap-3 border-b-2 border-ink bg-panel-2 pr-3">
+        <span
+          className="flex min-w-14 shrink-0 items-center justify-center border-r-2 border-ink bg-accent px-2 py-2 font-mono text-[28px] font-bold leading-none tabular-nums text-ink"
+          aria-label={`Scene ${scene.idx + 1}`}
+        >
+          {String(scene.idx + 1).padStart(2, "0")}
+        </span>
+        <div className="min-w-0 flex-1 py-2">
+          <h3 className="line-clamp-2 font-display text-[17px] font-bold leading-tight tracking-[-0.01em] text-ink" dir="auto" title={scene.title}>
             {scene.title}
-          </span>
+          </h3>
+          <div className="mt-1 flex flex-wrap items-center gap-2">
+            <span className="font-mono text-[13px] font-semibold text-ink">{scene.durationS}s</span>
+            <StatusBadge status={scene.status} />
+          </div>
         </div>
-        <StatusBadge status={scene.status} />
       </div>
       <div className="space-y-3 p-3">
         <SceneThumb id={scene.selectedAssetId} />
         <div className="flex flex-wrap items-center gap-1.5">
-          <Pill>{scene.durationS}s</Pill>
-          <Pill>{scene.aspect}</Pill>
-          <Pill>v{scene.version}</Pill>
+          <Pill className="font-mono">{scene.aspect}</Pill>
+          <Pill className="font-mono">v{scene.version}</Pill>
           {scene.tool && <Pill>{scene.tool}</Pill>}
           {vs && vt && (
             <Pill tone={vt.tone} title={vt.flagged ? "Needs footage that no verified tool can produce" : "Producible with verified tools"}>
@@ -239,11 +251,11 @@ function SceneCard({
             </div>
           </div>
         ) : (
-          <dl className="space-y-2 text-xs">
+          <dl className="space-y-2.5 text-[13px]">
             {scene.narration && (
               <div>
                 <dt className={LBL}>Narration</dt>
-                <dd dir="auto" className="mt-0.5 whitespace-pre-wrap leading-relaxed text-fg">
+                <dd dir="auto" className="mt-0.5 whitespace-pre-wrap leading-relaxed text-ink">
                   {scene.narration}
                 </dd>
               </div>
@@ -251,7 +263,7 @@ function SceneCard({
             {scene.onScreenText && (
               <div>
                 <dt className={LBL}>On-screen text</dt>
-                <dd dir="auto" className="mt-0.5 whitespace-pre-wrap text-fg">
+                <dd dir="auto" className="mt-0.5 whitespace-pre-wrap font-semibold text-ink">
                   {scene.onScreenText}
                 </dd>
               </div>
@@ -307,7 +319,7 @@ function SceneCard({
           </dl>
         )}
       </div>
-      <div className="mt-auto flex flex-wrap items-center gap-1.5 border-t border-line px-3 py-2">
+      <div className="mt-auto flex flex-wrap items-center gap-2 border-t-2 border-ink bg-panel-2 px-3 py-2.5">
         {!editing && (
           <Button
             size="sm"
@@ -395,24 +407,29 @@ export default function StoryboardPage() {
 
   if (error && !data)
     return (
-      <div className="p-6">
+      <div className="p-4 sm:p-6 lg:p-8">
         <ErrorNote>{error}</ErrorNote>
       </div>
     );
   if (!data)
     return (
-      <div className="p-6">
-        <Spinner />
+      <div className="space-y-6 p-4 sm:p-6 lg:p-8" role="status" aria-label="loading">
+        <Skeleton className="h-8 w-2/3" />
+        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+          <Skeleton className="h-72" />
+          <Skeleton className="hidden h-72 sm:block" />
+          <Skeleton className="hidden h-72 xl:block" />
+        </div>
       </div>
     );
 
   if (!scenes.length)
     return (
-      <div className="p-6">
+      <div className="p-4 sm:p-6 lg:p-8">
         <Empty
           title="No storyboard yet"
           action={
-            <Link href={`/projects/${id}/director`} className="inline-flex h-8 items-center rounded-md bg-accent px-3 text-[13px] font-medium text-accent-fg hover:brightness-110">
+            <Link href={`/projects/${id}/director`} className={btnCls("primary", "md")}>
               Create storyboard with the AI Director
             </Link>
           }
@@ -425,14 +442,14 @@ export default function StoryboardPage() {
   const flagged = scenes.filter((s) => typeof s.settings?.visualSource === "string" && visualTone(s.settings.visualSource as string).flagged).length;
 
   return (
-    <div className="space-y-5 p-6">
-      <div className="flex flex-wrap items-center gap-2 text-xs">
+    <div className="space-y-6 p-4 sm:p-6 lg:p-8">
+      <div className="flex flex-wrap items-center gap-2 text-[13px]">
         <Pill tone="info">{scenes.length} scenes</Pill>
-        <Pill>total {total.toFixed(1)}s</Pill>
+        <Pill className="font-mono">total {total.toFixed(1)}s</Pill>
         {Object.entries(counts).map(([k, v]) => (
           <span key={k} className="inline-flex items-center gap-1">
             <StatusBadge status={k} />
-            <span className="text-muted">{v}</span>
+            <span className="font-mono text-[13px] font-semibold text-ink">{v}</span>
           </span>
         ))}
         {flagged > 0 && <Pill tone="warn">{flagged} need footage</Pill>}
@@ -455,10 +472,12 @@ export default function StoryboardPage() {
 
       {groups.map(([name, list]) => (
         <section key={name} className="space-y-3">
-          <div className="flex items-baseline gap-2">
-            <h2 className="text-sm font-semibold">{name || "Storyboard"}</h2>
-            <span className="text-xs text-muted">
-              {list.length} scenes · {list.reduce((a, s) => a + s.durationS, 0).toFixed(1)}s
+          <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1 border-b-2 border-ink pb-2">
+            <h2 className="font-display text-[22px] font-extrabold leading-tight tracking-[-0.02em]" dir="auto">
+              {name || "Storyboard"}
+            </h2>
+            <span className="nb-label text-muted">
+              {list.length} scenes · <span className="font-mono">{list.reduce((a, s) => a + s.durationS, 0).toFixed(1)}s</span>
             </span>
           </div>
           <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">

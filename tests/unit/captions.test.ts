@@ -7,12 +7,12 @@ describe("captions", () => {
     transcription: [
       {
         offsets: { from: 0, to: 2000 },
-        text: " كافيهك تحت سيطرتك.",
+        text: " صباحك على مزاجك.",
         tokens: [
-          { text: " كافي", offsets: { from: 0, to: 400 }, p: 0.9, t_dtw: 0 },
-          { text: "هك", offsets: { from: 400, to: 700 }, p: 0.8, t_dtw: 0 },
-          { text: " تحت", offsets: { from: 700, to: 1100 }, p: 0.95, t_dtw: 0 },
-          { text: " سيطرتك.", offsets: { from: 1100, to: 2000 }, p: 0.4, t_dtw: 0 },
+          { text: " صبا", offsets: { from: 0, to: 400 }, p: 0.9, t_dtw: 0 },
+          { text: "حك", offsets: { from: 400, to: 700 }, p: 0.8, t_dtw: 0 },
+          { text: " على", offsets: { from: 700, to: 1100 }, p: 0.95, t_dtw: 0 },
+          { text: " مزاجك.", offsets: { from: 1100, to: 2000 }, p: 0.4, t_dtw: 0 },
           { text: "[_TT_100]", offsets: { from: 2000, to: 2000 }, p: 1, t_dtw: 0 },
         ],
       },
@@ -21,7 +21,7 @@ describe("captions", () => {
 
   it("merges sub-word tokens into words and drops special tokens", () => {
     const words = toWordCaptions(json);
-    expect(words.map((w) => w.text)).toEqual(["كافيهك", "تحت", "سيطرتك."]);
+    expect(words.map((w) => w.text)).toEqual(["صباحك", "على", "مزاجك."]);
     expect(words[0]).toMatchObject({ startMs: 0, endMs: 700, confidence: 0.8 });
   });
 
@@ -31,7 +31,7 @@ describe("captions", () => {
     const srt = toSrt(cues);
     expect(srt).toContain("00:00:00,000 --> 00:00:02,000");
     const back = parseSrt(srt);
-    expect(back[0]).toMatchObject({ text: "كافيهك تحت سيطرتك.", startMs: 0, endMs: 2000 });
+    expect(back[0]).toMatchObject({ text: "صباحك على مزاجك.", startMs: 0, endMs: 2000 });
   });
 
   it("splits long text by max characters", () => {

@@ -29,90 +29,79 @@ consistency is promised beyond what the compositions enforce.
 
 ---
 
-## Acceptance project: kafeeh
+## Walkthrough: the acme-cafe demo project
 
-*Kafeeh* is an Arabic-first café POS for Egypt. In narration the brand is pronounced «كافيه». The campaign line
-is «كافيهك تحت سيطرتك». Set it up with `npm run seed:kafeeh`.
+*Acme Café* is a **fictional** demo brand with dummy data only. Use it to learn the pipeline end to end without
+spending anything. Set it up with `npm run seed:demo` (see `scripts/seed-demo.ts`).
 
-### Inputs (all real)
+### 1. Seed
 
-- **Logos.** The official Kafeeh lockups (Arabic horizontal light/reversed, signature, mark) and the OG card,
-  from `CafeOS/apps/design/brand/kafeeh`.
-- **Photography.** Brand-graded crops from `CafeOS/apps/design/brand/photography`. The brand README states these
-  were cut from **generated concept boards**. They are therefore flagged `placeholder` and every cut that uses
-  them carries the burned-in banner **"DRAFT · placeholder visuals"**. They are also small (280–895 px wide),
-  so they look soft at 1080p.
-- **UI.** Live captures of `https://cafeos-app.vercel.app` (desktop 1440×900 @2× and mobile 430×932 @3×,
-  `ar-EG`), taken by Playwright. These are the public landing pages; in-app screens need a demo account.
-- **Claims.** 19 claims quoted from the live landing copy, including that **no price may be stated** because
-  pricing is still being decided.
+- `npm run seed:demo` creates the project `acme-cafe` ("Acme Café (demo)"), budget $0, product URL
+  `https://example.com`. It is idempotent: re-running reuses the project and skips files that are already imported.
+- **Assets.** Dummy media generated locally with FFmpeg into `data/demo-brand`: two logos (light and dark), four flat
+  colour stills standing in for brand photography, a 4 s test-pattern clip and an 8 s test tone standing in for
+  music. They are flagged `placeholder`, so every cut that uses them carries the burned-in banner
+  **"DRAFT · placeholder visuals"**. Replace them with real footage and licensed music before anything ships.
+- **Claims.** Invented "Demo claim: ..." facts, plus a rule that no price, customer number or award may be stated.
+  The AI may only use the claims listed on the project.
 
-### AI Director
+### 2. Director / plan
 
-- Model: `claude-opus-5-5`, through the Claude Code CLI.
-- Cost: **$0.1985**, 9,946 tokens in and 5,947 out, recorded in the ledger.
-- Plan: "Kafeeh — «كافيهك تحت سيطرتك» · Launch Commercial 32s + Cutdowns", with 6 scenes:
-  1. The rush
-  2. Kafeeh on an ordinary tablet
-  3. Tables & bar ticket
-  4. Internet cuts out
-  5. End of shift
-  6. Free trial + logo
-- Deliverables: 32 s 16:9, 15 s 9:16, 12 s 16:9 loop, 10 s 9:16 loop, and posters at 16:9, 9:16 and 4:5.
-- Questions the Director raised:
-  - Who records the Egyptian Arabic voiceover?
-  - Can we get a demo café account for real in-app screens?
-- Risks the Director raised:
-  - The photos come from generated boards and are low resolution.
-  - There is no Arabic TTS.
-  - The offline scene needs a device that has already been set up.
-  - Whisper `base` is weak on the Egyptian dialect.
-  - There is no licensed music.
+- The seed accepts a **hand-written fixture plan**, "Acme Café — Morning ritual (demo)", through the normal accept
+  code path. It is not produced by the AI Director. It has 4 scenes (counter, espresso bar, pastry shelf and an end
+  card titled «صباحك على مزاجك» to keep RTL coverage) and two deliverables: a 20 s 16:9 spot and a 10 s 9:16 social cut.
+- To try the real Director, open the project's **AI Director** tab, edit the brief and press Plan. Read the script,
+  the storyboard, the **questions** and the **risks**, then accept with a visual pool, logos, music and a voiceover
+  source. Planning uses the Claude Code CLI and records its cost in the ledger.
 
-### Workflow
+### 3. Storyboard and flow
 
-37 nodes in total:
-- 5 desktop + 4 mobile UI captures, 1 brand photo, 2 logos
-- 2 Remotion cuts → QA → approval → export
-- 2 Remotion loops → seamless crossfade (MP4 + WebM) → QA → approval → export
-- 3 Remotion posters → export
+- The accepted plan creates the **Storyboard** and a validated workflow graph. Review scenes in Storyboard / Preview;
+  inspect or adjust the graph in the flow editor (live validation blocks Run after an invalid edit).
+- Unavailable generators are shown in the graph rather than hidden. Nothing is promised that discovery did not verify
+  (see `TOOL_ADAPTERS.md`).
 
-The graph validated with zero issues and runs with no paid steps.
+### 4. Run
 
-### Results (verified with ffprobe + manual frame review)
+- Press Run in the flow editor. A preauthorized budget lets known-price paid steps run without asking; steps with
+  unknown prices always ask. The demo plan uses no paid steps (`voiceover: none`).
+- Re-running reuses cached nodes; only changed nodes re-render. Regenerate a single scene with selective rerun.
 
-| Deliverable | Spec (measured) | QA | Status |
-| --- | --- | --- | --- |
-| Commercial 16:9 | 1920×1080, 30 fps, 32.04 s, H.264 yuv420p, AAC 48 kHz stereo (silent) | PASS (loudness minor: silent) | rendered; **final approval pending (yours)** |
-| Social cut 9:16 | 1080×1920, 30 fps, 15.06 s, H.264 yuv420p, AAC (silent) | PASS (loudness minor) | rendered; approval pending |
-| Desktop homepage loop | 1920×1080, 30 fps, 12.0 s, muted MP4 + WebM (VP9), seamless crossfade | PASS | rendered; approval pending |
-| Mobile homepage loop | 1080×1920, 30 fps, 10.0 s, muted MP4 + WebM | PASS | rendered; approval pending |
-| Poster 16:9 / 9:16 / 4:5 | 1920×1080 / 1080×1920 / 1080×1350 PNG | — | **exported** |
-| Subtitles | — | — | blocked: there is no voiceover to transcribe |
-| Editable compositions | the `composition.json` props of each render, plus `/remotion` sources | — | produced by every render from now on |
+### 5. Approvals
 
-The finished files are in the Asset Library (Preview tab). Approving the four gates in the Render Queue copies
-them to `data/exports/kafeeh/`. Creative approval is deliberately left to a human.
+- The Render Queue lists paid steps and creative gates (voiceover pronunciation, captions, final cut). The preview on
+  each gate shows exactly what you are approving. Creative approval is deliberately left to a human.
 
-### Manual review notes
+### 6. QA
 
-- RTL Arabic typography (IBM Plex Sans Arabic), the brand palette, the official lockups and the end card render
-  correctly at 16:9 and 9:16.
-- The live site's product mockup still contains the old **"CafeOS"** wordmark (visible in the end-of-shift and
-  offline UI scenes). Fix it on the site, then rerun the capture nodes; the cache re-renders only what changed.
-- The corner logo has low contrast over bright areas of the hero photo.
-- Scenes 3–5 show landing-page sections that illustrate the claim, not the exact in-app screen (offline queue,
-  shift close). A demo account plus scripted Playwright navigation would fix this.
+- `production.qa` checks resolution, aspect, fps, duration, codec, `yuv420p`, audio stream present and black
+  segments. Loudness is flagged *minor* on silent cuts (no voiceover or music available). Extracted frames can also
+  go through an advisory AI review. QA is a technical gate: inspect frames yourself before approving.
+- Check that the DRAFT banner is present on any cut that uses placeholder visuals.
 
-### Blockers and what unlocks them
+### 7. Export
 
-| Blocker | Unlock |
+- Approving the export gates copies deliverables to `data/exports/acme-cafe/`. Finished files are also in the Asset
+  Library (Preview tab).
+
+### Arabic / RTL notes
+
+- RTL layout and Arabic typography (IBM Plex Sans Arabic) are provided by the compositions; the demo's Arabic end card
+  «صباحك على مزاجك» is there to exercise them. Set the plan `direction` to `rtl` for Arabic-first projects.
+- There is no Arabic TTS in the local tools: FilmCraft TTS is English-only. Arabic voiceover needs an ElevenLabs
+  key (Settings → Credentials) and a voice id, or an imported human recording. Pronunciation must be verified by
+  listening, and a brand name may need a phonetic respelling.
+- Whisper `base` is weak on dialects; use `small`/`medium` and proofread the captions.
+
+### Limitations and what unlocks them
+
+| Limitation | Unlock |
 | --- | --- |
-| Egyptian Arabic voiceover | Add an ElevenLabs API key (Settings → Credentials) and a voice id, or import a human recording. The plan already includes pronunciation and caption review gates. |
-| Authentic Egyptian café footage | Shoot or license footage and import it. Alternatively, add a video-generation provider adapter + key (Runway/fal/Higgsfield) and approve the spend. |
+| Arabic voiceover | Add an ElevenLabs API key (Settings → Credentials) and a voice id, or import a human recording. Keep the pronunciation and caption review gates. |
+| Real footage | Shoot or license footage and import it. Alternatively, add a video-generation provider adapter + key and approve the spend. |
 | Music | Import a licensed track. |
-| Real in-app screens | A demo café account and an in-app capture flow. |
+| Real in-app screens | A demo account for your product and an in-app capture flow (Playwright captures any http(s) page). |
 | Sharper photos | Real photography, or install Real-ESRGAN for an upscale adapter. |
 
-Once a voiceover exists, rerun from the Director accept step with `voiceover: elevenlabs | asset`. The engine
-reuses every capture and only re-renders the cuts. Captions come from whisper `small`/`medium` and must be proofread.
+Once a voiceover exists, rerun from the Director accept step with `voiceover: elevenlabs | asset`. The engine reuses
+every capture and only re-renders the cuts. Captions come from whisper `small`/`medium` and must be proofread.

@@ -70,7 +70,7 @@ export class PlaywrightAdapter implements ToolAdapter {
   }
 
   capabilities(): CapabilitySpec[] {
-    const base = { adapter: "playwright", paid: false, cost: { model: "free" as const, note: "Local headless browser." }, verifiedBy: "Chromium launch at health check; capture of the live kafeeh site" };
+    const base = { adapter: "playwright", paid: false, cost: { model: "free" as const, note: "Local headless browser." }, verifiedBy: "Chromium launch at health check; capture of a live http(s) page" };
     return [
       { ...base, id: "playwright.screenshot", operation: "screenshot", label: "Capture UI screenshot", description: "Screenshot a real web page at a viewport size, locale and color scheme (optionally full page or one element).", inputFormats: ["url"], outputFormats: ["png"] },
       { ...base, id: "playwright.record", operation: "record", label: "Record UI walkthrough", description: "Record a real page while scrolling smoothly or hovering selectors; outputs WebM (encode with ffmpeg).", inputFormats: ["url"], outputFormats: ["webm"], limitations: ["Recording frame rate is ~25 fps and depends on machine load"] },
