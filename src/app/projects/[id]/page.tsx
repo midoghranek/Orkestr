@@ -1,0 +1,300 @@
+"use client";
+
+import Link from "next/link";
+import { useState } from "react";
+import { ago, api, fmtBytes, fmtUsd } from "@/lib/api";
+import { AssetPreview, Button, Card, CardHeader, Empty, Field, Input, Notice, Progress, StatusBadge, Textarea, toast } from "@/components/ui";
+import { useProject } from "@/components/project-context";
+
+export default function ProjectOverview() {
+  const { data, reload } = useProject();
+  const [editing, setEditing] = useState(false);
+  if (!data) return <div className="p-6 text-xs text-faint">Loading…</div>;
+  const { project, costs, runs, workflows, approvals, exports, assets, scenes } = data;
+  const base = `/projects/${project.slug}`;
+  const budgetUsed = project.budgetUsd > 0 ? costs.actualKnownUsd / project.budgetUsd : 0;
+
+  return (
+    <div className="grid gap-4 p-6 xl:grid-cols-3">
+      <div className="space-y-4 xl:col-span-2">
+        {approvals.length > 0 && (
+          <Notice tone="warn">
+            {approvals.length} step{approvals.length > 1 ? "s" : ""} waiting for your approval.{" "}
+            <Link href="/queue" className="underline">
+              Review in the render queue
+            </Link>
+            .
+          </Notice>
+        )}
+        <Card>
+          <CardHeader
+            title="Workflows"
+            sub="Visual flows that produce this project's assets."
+            actions={
+              <Link href={`${base}/flows`}>
+                <Button size="sm">Open flows</Button>
+              </Link>
+            }
+          />
+          {workflows.length === 0 ? (
+            <div className="p-4">
+              <Empty title="No workflow yet" action={<Link href={`${base}/director`}><Button variant="primary" size="sm">Plan with the AI Director</Button></Link>}>
+                Describe what you want; the AI Director proposes a script and storyboard and builds a validated workflow from the tools that actually work here.
+              </Empty>
+            </div>
+          ) : (
+            <div className="divide-y divide-line">
+              {workflows.map((w) => {
+                const last = runs.find((r) => r.workflowId === w.id);
+                return (
+                  <Link key={w.id} href={`${base}/flows/${w.id}`} className="flex items-center gap-3 px-4 py-2.5 hover:bg-panel-2/50">
+                    <div className="min-w-0 flex-1">
+                      <div className="truncate text-[13px]">{w.name}</div>
+                      <div className="text-[11px] text-faint">
+                        {w.nodes} nodes · v{w.version} · {w.source} · {ago(w.updatedAt)}
+                      </div>
+                    </div>
+                    {last && <StatusBadge status={last.status} />}
+                  </Link>
+                );
+              })}
+            </div>
+          )}
+        </Card>
+
+        <Card>
+          <CardHeader title="Recent runs" />
+          {runs.length === 0 ? (
+            <div className="px-4 py-6 text-center text-xs text-muted">No runs yet.</div>
+          ) : (
+            <div className="divide-y divide-line">
+              {runs.slice(0, 8).map((r) => (
+                <Link key={r.id} href={`${base}/flows/${r.workflowId}?run=${r.id}`} className="block px-4 py-2.5 hover:bg-panel-2/50">
+                  <div className="flex items-center gap-3">
+                    <span className="min-w-0 flex-1 truncate text-[13px]">{r.workflowName}</span>
+                    <span className="text-[11px] text-faint">{Object.entries(r.counts).map(([k, v]) => `${v} ${k}`).join(" · ")}</span>
+                    <StatusBadge status={r.status} />
+                  </div>
+                  <Progress className="mt-1.5" value={r.progress} tone={r.status === "failed" ? "err" : r.status === "completed" ? "ok" : "accent"} indeterminate={r.status === "running" && r.progress === 0} />
+                  {r.error && <div className="mt-1 truncate text-[11px] text-err">{r.error}</div>}
+                </Link>
+              ))}
+            </div>
+          )}
+        </Card>
+
+        <Card>
+          <CardHeader title="Latest assets" sub={`${data.assetCount} in library`} actions={<Link href={`${base}/assets`} className="text-xs text-muted hover:text-fg">Asset library</Link>} />
+          {assets.length === 0 ? (
+            <div className="px-4 py-6 text-center text-xs text-muted">No assets yet.</div>
+          ) : (
+            <div className="grid grid-cols-3 gap-2 p-3 md:grid-cols-6">
+              {assets.filter((a) => ["image", "video"].includes(a.kind)).slice(0, 12).map((a) => (
+                <div key={a.id} className="aspect-video overflow-hidden rounded border border-line bg-black" title={a.label}>
+                  <AssetPreview asset={a} controls={false} />
+                </div>
+              ))}
+            </div>
+          )}
+        </Card>
+      </div>
+
+      <div className="space-y-4">
+        <Card>
+          <CardHeader title="Spend" sub="Actuals reported by providers; unknown prices are listed, never guessed." />
+          <div className="space-y-3 p-4">
+            <div className="flex items-baseline justify-between">
+              <span className="text-xs text-muted">Known spend</span>
+              <span className="text-base font-semibold">{fmtUsd(costs.actualKnownUsd)}</span>
+            </div>
+            {project.budgetUsd > 0 && (
+              <div>
+                <Progress value={Math.min(1, budgetUsed)} tone={budgetUsed > 0.9 ? "err" : "accent"} />
+                <div className="mt-1 text-[11px] text-faint">of {fmtUsd(project.budgetUsd)} budget</div>
+              </div>
+            )}
+            <div className="grid grid-cols-2 gap-2 text-[11px] text-muted">
+              <span>Unknown-price calls: {costs.actualUnknownCount}</span>
+              <span>Reused results: {costs.reusedCount}</span>
+              <span>Tokens in/out: {costs.tokensIn}/{costs.tokensOut}</span>
+              <span>Billable calls: {costs.apiCalls}</span>
+            </div>
+            {costs.byProvider.length > 0 && (
+              <div className="divide-y divide-line rounded border border-line text-[11px]">
+                {costs.byProvider.map((p) => (
+                  <div key={p.provider} className="flex justify-between px-2 py-1">
+                    <span className="text-muted">{p.provider}</span>
+                    <span>
+                      {fmtUsd(p.actualUsd)}
+                      {p.unknown ? ` + ${p.unknown} unknown` : ""}
+                      {p.units ? ` · ${p.quantity} ${p.units}s` : ""}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </Card>
+
+        <Card>
+          <CardHeader title="Storyboard" actions={<Link href={`${base}/storyboard`} className="text-xs text-muted hover:text-fg">Open</Link>} />
+          <div className="p-4 text-xs text-muted">
+            {scenes.length ? (
+              <>
+                {scenes.length} scenes · {scenes.reduce((s, x) => s + x.durationS, 0).toFixed(1)}s ·{" "}
+                {scenes.filter((s) => s.status === "approved").length} approved
+                <div className="mt-2 flex h-2 overflow-hidden rounded">
+                  {scenes.map((s) => (
+                    <div key={s.id} style={{ flex: s.durationS }} className={`border-r border-bg ${s.status === "approved" ? "bg-ok" : s.status === "review" ? "bg-accent" : s.status === "failed" ? "bg-err" : "bg-line-strong"}`} title={`${s.idx + 1}. ${s.title}`} />
+                  ))}
+                </div>
+              </>
+            ) : (
+              "No storyboard yet."
+            )}
+          </div>
+        </Card>
+
+        <Card>
+          <CardHeader title="Exports" />
+          {exports.length === 0 ? (
+            <div className="px-4 py-4 text-xs text-muted">Nothing exported yet. Export nodes write here after final approval.</div>
+          ) : (
+            <div className="divide-y divide-line">
+              {exports.map((e) => (
+                <a key={e.name} href={`/api/exports/file?projectId=${project.id}&name=${encodeURIComponent(e.name)}`} className="flex items-center justify-between px-4 py-2 text-xs hover:bg-panel-2/50">
+                  <span className="truncate">{e.name}</span>
+                  <span className="text-faint">{fmtBytes(e.size)}</span>
+                </a>
+              ))}
+            </div>
+          )}
+        </Card>
+
+        <Card>
+          <CardHeader title="Brand & facts" sub="The AI may only claim what is listed here." actions={<Button size="sm" variant="ghost" onClick={() => setEditing(!editing)}>{editing ? "Close" : "Edit"}</Button>} />
+          {editing ? (
+            <ProjectEditor onSaved={() => { setEditing(false); void reload(); }} />
+          ) : (
+            <div className="space-y-2 p-4 text-xs">
+              <Row k="Brand" v={project.settings.brandName} />
+              <Row k="Pronounced" v={project.settings.brandPronunciation} rtl />
+              <Row k="Language" v={project.settings.language} />
+              <Row k="Product URL" v={project.settings.productUrl} />
+              <Row k="Budget" v={fmtUsd(project.budgetUsd)} />
+              <div>
+                <div className="text-faint">Verified claims ({project.settings.verifiedClaims.length})</div>
+                <ul className="mt-1 list-disc space-y-0.5 pl-4 text-muted" dir="auto">
+                  {project.settings.verifiedClaims.slice(0, 8).map((c) => (
+                    <li key={c}>{c}</li>
+                  ))}
+                </ul>
+                {project.settings.verifiedClaims.length > 8 && <div className="text-faint">+{project.settings.verifiedClaims.length - 8} more</div>}
+              </div>
+              {project.settings.palette && (
+                <div className="flex gap-1">
+                  {Object.entries(project.settings.palette).map(([k, v]) => (
+                    <span key={k} title={`${k} ${v}`} className="size-5 rounded border border-line" style={{ background: v }} />
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+        </Card>
+      </div>
+    </div>
+  );
+}
+
+function Row({ k, v, rtl }: { k: string; v?: string; rtl?: boolean }) {
+  return (
+    <div className="flex gap-2">
+      <span className="w-24 shrink-0 text-faint">{k}</span>
+      <span className="min-w-0 break-words text-muted" dir={rtl ? "rtl" : "auto"}>
+        {v || "—"}
+      </span>
+    </div>
+  );
+}
+
+function ProjectEditor({ onSaved }: { onSaved: () => void }) {
+  const { data } = useProject();
+  const p = data!.project;
+  const [f, setF] = useState({
+    name: p.name,
+    description: p.description,
+    budgetUsd: String(p.budgetUsd),
+    brandName: p.settings.brandName ?? "",
+    brandPronunciation: p.settings.brandPronunciation ?? "",
+    language: p.settings.language ?? "",
+    productUrl: p.settings.productUrl ?? "",
+    claims: p.settings.verifiedClaims.join("\n"),
+    brandNotes: p.settings.brandNotes ?? "",
+  });
+  const [busy, setBusy] = useState(false);
+  const save = async () => {
+    setBusy(true);
+    try {
+      await api(`/api/projects/${p.id}`, {
+        method: "PATCH",
+        json: {
+          name: f.name,
+          description: f.description,
+          budgetUsd: Number(f.budgetUsd) || 0,
+          settings: {
+            brandName: f.brandName || undefined,
+            brandPronunciation: f.brandPronunciation || undefined,
+            language: f.language || undefined,
+            productUrl: f.productUrl || undefined,
+            brandNotes: f.brandNotes || undefined,
+            verifiedClaims: f.claims.split("\n").map((s) => s.trim()).filter(Boolean),
+          },
+        },
+      });
+      toast("Project saved", "ok");
+      onSaved();
+    } catch (e) {
+      toast((e as Error).message, "err");
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <div className="space-y-3 p-4">
+      <Field label="Name">
+        <Input value={f.name} onChange={(e) => setF({ ...f, name: e.target.value })} />
+      </Field>
+      <Field label="Description">
+        <Textarea value={f.description} onChange={(e) => setF({ ...f, description: e.target.value })} className="min-h-12" />
+      </Field>
+      <div className="grid grid-cols-2 gap-2">
+        <Field label="Brand">
+          <Input value={f.brandName} onChange={(e) => setF({ ...f, brandName: e.target.value })} />
+        </Field>
+        <Field label="Pronunciation">
+          <Input dir="auto" value={f.brandPronunciation} onChange={(e) => setF({ ...f, brandPronunciation: e.target.value })} />
+        </Field>
+        <Field label="Language">
+          <Input value={f.language} onChange={(e) => setF({ ...f, language: e.target.value })} />
+        </Field>
+        <Field label="Budget USD">
+          <Input type="number" min={0} value={f.budgetUsd} onChange={(e) => setF({ ...f, budgetUsd: e.target.value })} />
+        </Field>
+      </div>
+      <Field label="Product URL">
+        <Input value={f.productUrl} onChange={(e) => setF({ ...f, productUrl: e.target.value })} />
+      </Field>
+      <Field label="Verified claims" hint="One per line. The AI Director may only use these product facts.">
+        <Textarea dir="auto" value={f.claims} onChange={(e) => setF({ ...f, claims: e.target.value })} />
+      </Field>
+      <Field label="Brand notes">
+        <Textarea value={f.brandNotes} onChange={(e) => setF({ ...f, brandNotes: e.target.value })} className="min-h-14" />
+      </Field>
+      <div className="flex justify-end">
+        <Button variant="primary" busy={busy} onClick={save}>
+          Save
+        </Button>
+      </div>
+    </div>
+  );
+}

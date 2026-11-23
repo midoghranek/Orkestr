@@ -1,0 +1,57 @@
+{
+  "id": "explainer-video",
+  "name": "Explainer Video",
+  "description": "English explainer: an AI-written script, a free local scratch narration (FilmCraft, English only), Whisper captions, title-card scenes, QA and export. Swap the scratch voice for ElevenLabs before release.",
+  "aspect": "16:9",
+  "durationS": 24,
+  "vars": [
+    { "name": "topic", "label": "What to explain (facts only)", "type": "text" },
+    { "name": "t1", "label": "Scene 1 title", "type": "string" },
+    { "name": "t2", "label": "Scene 2 title", "type": "string" },
+    { "name": "t3", "label": "Scene 3 title", "type": "string" },
+    { "name": "cta", "label": "End card", "type": "string" },
+    { "name": "slug", "label": "Export name prefix", "type": "string", "default": "explainer" }
+  ],
+  "graph": {
+    "version": 1,
+    "nodes": [
+      { "id": "topic", "type": "logic.text", "label": "Topic", "params": { "text": "{{topic}}" }, "position": { "x": 0, "y": 0 } },
+      { "id": "script", "type": "ai.write", "label": "Script writer", "params": { "instruction": "Write a 55-word, plain-English narration (about 22 seconds) explaining the topic. Use only facts from the context. No headings, no stage directions." }, "position": { "x": 300, "y": 0 } },
+      { "id": "narration", "type": "audio.tts_local", "label": "Scratch narration", "params": { "voice": "basic-female", "pace": 1 }, "position": { "x": 600, "y": 0 } },
+      { "id": "norm", "type": "audio.normalize", "label": "Normalize", "params": { "format": "m4a" }, "position": { "x": 900, "y": 0 } },
+      { "id": "captions", "type": "audio.transcribe", "label": "Captions", "params": { "language": "en", "maxChars": 42 }, "position": { "x": 1200, "y": 0 } },
+      {
+        "id": "compose",
+        "type": "production.compose",
+        "label": "Compose",
+        "params": {
+          "aspect": "16:9",
+          "fps": 30,
+          "direction": "ltr",
+          "scenes": [
+            { "id": "s1", "durationS": 6, "layout": "title", "headline": "{{t1}}", "visual": null },
+            { "id": "s2", "durationS": 6, "layout": "title", "headline": "{{t2}}", "visual": null, "transition": "slide" },
+            { "id": "s3", "durationS": 6, "layout": "title", "headline": "{{t3}}", "visual": null, "transition": "slide" },
+            { "id": "s4", "durationS": 6, "layout": "end-card", "headline": "{{cta}}", "visual": null }
+          ]
+        },
+        "position": { "x": 1500, "y": 100 }
+      },
+      { "id": "qa", "type": "production.qa", "label": "QA", "params": { "expectWidth": 1920, "expectHeight": 1080, "expectFps": 30, "minDurationS": 23.5, "maxDurationS": 24.5 }, "position": { "x": 1800, "y": 0 } },
+      { "id": "approve", "type": "logic.approval", "label": "Approve", "params": { "title": "Approve the explainer" }, "position": { "x": 2100, "y": 100 } },
+      { "id": "export", "type": "production.export", "label": "Export", "params": { "name": "{{slug}}-explainer-16x9" }, "position": { "x": 2400, "y": 100 } }
+    ],
+    "edges": [
+      { "id": "e1", "source": "topic", "sourceHandle": "text", "target": "script", "targetHandle": "context" },
+      { "id": "e2", "source": "script", "sourceHandle": "text", "target": "narration", "targetHandle": "script" },
+      { "id": "e3", "source": "narration", "sourceHandle": "audio", "target": "norm", "targetHandle": "audio" },
+      { "id": "e4", "source": "norm", "sourceHandle": "audio", "target": "captions", "targetHandle": "audio" },
+      { "id": "e5", "source": "norm", "sourceHandle": "audio", "target": "compose", "targetHandle": "voiceover" },
+      { "id": "e6", "source": "captions", "sourceHandle": "subtitles", "target": "compose", "targetHandle": "subtitles" },
+      { "id": "e7", "source": "compose", "sourceHandle": "video", "target": "qa", "targetHandle": "video" },
+      { "id": "e8", "source": "qa", "sourceHandle": "report", "target": "approve", "targetHandle": "in" },
+      { "id": "e9", "source": "compose", "sourceHandle": "video", "target": "approve", "targetHandle": "in" },
+      { "id": "e10", "source": "approve", "sourceHandle": "out", "target": "export", "targetHandle": "asset" }
+    ]
+  }
+}

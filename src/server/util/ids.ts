@@ -33,3 +33,13 @@ export async function sha256File(file: string): Promise<string> {
   });
   return hash.digest("hex");
 }
+
+/**
+ * Keep only keys the caller actually sent. Zod 4's `.partial()` still applies field defaults, so a parsed
+ * PATCH body would otherwise overwrite untouched fields with their defaults.
+ */
+export function onlyProvided<T extends Record<string, unknown>>(raw: unknown, parsed: T): Partial<T> {
+  if (!raw || typeof raw !== "object") return {};
+  const keys = new Set(Object.keys(raw as object));
+  return Object.fromEntries(Object.entries(parsed).filter(([k]) => keys.has(k))) as Partial<T>;
+}

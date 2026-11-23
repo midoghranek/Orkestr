@@ -5,6 +5,8 @@ import { z } from "zod";
 import { ROOT_DIR, dataDir } from "../util/paths";
 import { sha256 } from "../util/ids";
 import { EphemeralFileServer } from "../util/fileserver";
+import { allowedExecutable, runAllowed } from "../util/proc";
+import { FfmpegAdapter } from "./ffmpeg";
 import {
   AdapterError,
   checkAborted,
@@ -23,7 +25,7 @@ export const REMOTION_DIR = path.join(ROOT_DIR, "remotion");
 export const COMPOSITIONS = ["Commercial", "Poster", "Loop", "TestCard"] as const;
 
 /** Hash of every source file under remotion/ — the bundle is rebuilt only when compositions change. */
-function sourceHash(): string {
+export function sourceHash(): string {
   const parts: string[] = [];
   const walk = (dir: string) => {
     for (const e of fs.readdirSync(dir, { withFileTypes: true }).sort((a, b) => a.name.localeCompare(b.name))) {
@@ -61,8 +63,17 @@ export async function getBundle(log?: ExecContext["log"]): Promise<string> {
   return promise;
 }
 
-/** Replace `{"$file": "<abs path>"}` leaves with loopback URLs served for the duration of the render. */
+export const FILE_PREFIX = "orkestr-file:";
+/** Mark a local file for a render prop. Plain strings keep the props schema-valid. */
+export const fileRef = (p: string) => `${FILE_PREFIX}${p}`;
+
+/** Replace `orkestr-file:<abs path>` strings (or legacy `{"$file"}` objects) with loopback URLs served for the duration of the render. */
 export function bindFiles(value: unknown, server: EphemeralFileServer): unknown {
+  if (typeof value === "string" && value.startsWith(FILE_PREFIX)) {
+    const p = value.slice(FILE_PREFIX.length);
+    if (!fs.existsSync(p)) throw new AdapterError("INVALID_INPUT", `render input missing: ${p}`);
+    return server.url(p);
+  }
   if (Array.isArray(value)) return value.map((v) => bindFiles(v, server));
   if (value && typeof value === "object") {
     const o = value as Record<string, unknown>;
@@ -73,6 +84,19 @@ export function bindFiles(value: unknown, server: EphemeralFileServer): unknown 
     return Object.fromEntries(Object.entries(o).map(([k, v]) => [k, bindFiles(v, server)]));
   }
   return value;
+}
+
+async function toWebSafe(file: string, ctx: ExecContext): Promise<string> {
+  const ff = new FfmpegAdapter();
+  if (!allowedExecutable("ffmpeg")) await ff.discover();
+  const probe = await ff.probe(file, ctx.signal);
+  const v = probe.streams.find((s) => s.codec_type === "video");
+  if (v?.pix_fmt === "yuv420p") return file;
+  const out = file.replace(/.mp4$/, ".web.mp4");
+  const r = await runAllowed("ffmpeg", ["-hide_banner", "-loglevel", "error", "-y", "-i", file, "-vf", "scale=in_range=full:out_range=tv,format=yuv420p", "-color_range", "tv", "-colorspace", "bt709", "-color_primaries", "bt709", "-color_trc", "bt709", "-c:v", "libx264", "-crf", "17", "-preset", "slow", "-c:a", "copy", "-movflags", "+faststart", out], { signal: ctx.signal, timeoutMs: 30 * 60_000 });
+  if (r.code !== 0) throw new AdapterError("TOOL_FAILED", `pixel-format pass failed: ${r.stderr.slice(-400)}`);
+  fs.rmSync(file, { force: true });
+  return out;
 }
 
 const FREE = { model: "free" as const, note: "Local render; Remotion licence terms apply to companies (see remotion.dev/license)." };
@@ -154,7 +178,7 @@ export class RemotionAdapter implements ToolAdapter {
       const composition = await renderer.selectComposition({ serveUrl, id: p.composition, inputProps, logLevel: "error" });
       if (operation === "still") {
         const out = path.join(ctx.workDir, `${p.composition.toLowerCase()}.${p.format === "jpeg" ? "jpg" : "png"}`);
-        await renderer.renderStill({ serveUrl, composition, output: out, inputProps, frame: p.frame, imageFormat: p.format, jpegQuality: 92, logLevel: "error", cancelSignal });
+        await renderer.renderStill({ serveUrl, composition, output: out, inputProps, frame: p.frame, imageFormat: p.format, ...(p.format === "jpeg" ? { jpegQuality: 92 } : {}), logLevel: "error", cancelSignal });
         return { artifacts: [{ file: out, kind: "image", port: "image", metadata: { width: composition.width, height: composition.height } }] };
       }
       if (operation !== "render") throw new AdapterError("UNSUPPORTED", `remotion has no operation ${operation}`);
@@ -174,8 +198,16 @@ export class RemotionAdapter implements ToolAdapter {
         logLevel: "error",
         onProgress: ({ progress, stitchStage }) => ctx.progress(Math.min(0.99, 0.02 + progress * 0.97), `rendering (${stitchStage})`),
       });
+      // Remotion encodes from JPEG frames and tags the stream full-range (yuvj420p). Convert to limited-range
+      // yuv420p so every browser/player decodes colours identically (QA requires it).
+      ctx.progress(0.995, "normalizing pixel format");
+      const final = await toWebSafe(out, ctx);
+      // Editable composition: the exact props (with local file paths) to reopen in Remotion Studio or re-render.
+      const propsFile = path.join(ctx.workDir, "composition.json");
+      fs.writeFileSync(propsFile, JSON.stringify({ composition: p.composition, props: p.props }, null, 2));
       return {
-        artifacts: [{ file: out, kind: "video", port: "video", metadata: { composition: p.composition, width: composition.width, height: composition.height, fps: composition.fps, durationInFrames: composition.durationInFrames } }],
+        artifacts: [
+          { file: propsFile, kind: "json", port: "composition", label: `${p.composition} composition props (editable)` },{ file: final, kind: "video", port: "video", metadata: { composition: p.composition, width: composition.width, height: composition.height, fps: composition.fps, durationInFrames: composition.durationInFrames } }],
       };
     } catch (err) {
       if (ctx.signal.aborted) throw new AdapterError("CANCELLED", "render cancelled");

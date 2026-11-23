@@ -1,0 +1,58 @@
+{
+  "id": "product-demo",
+  "name": "Product Demo",
+  "description": "Real-UI product walkthrough: Playwright captures of the live product at three scroll depths plus a recorded scroll, framed in a device, with titles and an end card. No AI generation, no paid steps.",
+  "aspect": "16:9",
+  "durationS": 20,
+  "vars": [
+    { "name": "productUrl", "label": "Live product URL", "type": "url" },
+    { "name": "title", "label": "Opening title", "type": "string" },
+    { "name": "cta", "label": "End-card call to action", "type": "string" },
+    { "name": "logoReversedAssetId", "label": "Logo (dark background) asset id", "type": "assetId" },
+    { "name": "locale", "label": "Browser locale", "type": "string", "default": "ar-EG" },
+    { "name": "slug", "label": "Export name prefix", "type": "string", "default": "demo" }
+  ],
+  "graph": {
+    "version": 1,
+    "nodes": [
+      { "id": "cap1", "type": "image.capture", "label": "UI · top", "params": { "url": "{{productUrl}}", "locale": "{{locale}}", "scrollTo": 0 }, "position": { "x": 0, "y": 0 } },
+      { "id": "cap2", "type": "image.capture", "label": "UI · features", "params": { "url": "{{productUrl}}", "locale": "{{locale}}", "scrollTo": 900 }, "position": { "x": 0, "y": 140 } },
+      { "id": "cap3", "type": "image.capture", "label": "UI · details", "params": { "url": "{{productUrl}}", "locale": "{{locale}}", "scrollTo": 1800 }, "position": { "x": 0, "y": 280 } },
+      { "id": "walk", "type": "video.capture", "label": "UI walkthrough", "params": { "url": "{{productUrl}}", "locale": "{{locale}}", "durationS": 6, "scrollTo": 2400 }, "position": { "x": 0, "y": 420 } },
+      { "id": "logo", "type": "production.import", "label": "Logo (reversed)", "params": { "assetId": "{{logoReversedAssetId}}" }, "position": { "x": 0, "y": 560 } },
+      {
+        "id": "compose",
+        "type": "production.compose",
+        "label": "Compose",
+        "params": {
+          "aspect": "16:9",
+          "fps": 30,
+          "direction": "rtl",
+          "scenes": [
+            { "id": "s1", "durationS": 3, "layout": "title", "headline": "{{title}}", "visual": null },
+            { "id": "s2", "durationS": 3.5, "layout": "ui-showcase", "visualIndex": 0 },
+            { "id": "s3", "durationS": 3.5, "layout": "ui-showcase", "visualIndex": 1 },
+            { "id": "s4", "durationS": 3.5, "layout": "ui-showcase", "visualIndex": 2 },
+            { "id": "s5", "durationS": 4, "layout": "full-bleed", "visualIndex": 3 },
+            { "id": "s6", "durationS": 2.5, "layout": "end-card", "headline": "{{cta}}", "visual": null }
+          ]
+        },
+        "position": { "x": 300, "y": 200 }
+      },
+      { "id": "qa", "type": "production.qa", "label": "QA", "params": { "expectWidth": 1920, "expectHeight": 1080, "expectFps": 30, "minDurationS": 19.5, "maxDurationS": 20.5, "requireAudio": false }, "position": { "x": 600, "y": 120 } },
+      { "id": "approve", "type": "logic.approval", "label": "Approve", "params": { "title": "Approve the product demo" }, "position": { "x": 900, "y": 200 } },
+      { "id": "export", "type": "production.export", "label": "Export", "params": { "name": "{{slug}}-product-demo-16x9" }, "position": { "x": 1200, "y": 200 } }
+    ],
+    "edges": [
+      { "id": "e1", "source": "cap1", "sourceHandle": "image", "target": "compose", "targetHandle": "visuals" },
+      { "id": "e2", "source": "cap2", "sourceHandle": "image", "target": "compose", "targetHandle": "visuals" },
+      { "id": "e3", "source": "cap3", "sourceHandle": "image", "target": "compose", "targetHandle": "visuals" },
+      { "id": "e4", "source": "walk", "sourceHandle": "video", "target": "compose", "targetHandle": "visuals" },
+      { "id": "e5", "source": "logo", "sourceHandle": "asset", "target": "compose", "targetHandle": "logo" },
+      { "id": "e6", "source": "compose", "sourceHandle": "video", "target": "qa", "targetHandle": "video" },
+      { "id": "e7", "source": "compose", "sourceHandle": "video", "target": "approve", "targetHandle": "in" },
+      { "id": "e8", "source": "qa", "sourceHandle": "report", "target": "approve", "targetHandle": "in" },
+      { "id": "e9", "source": "approve", "sourceHandle": "out", "target": "export", "targetHandle": "asset" }
+    ]
+  }
+}

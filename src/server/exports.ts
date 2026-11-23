@@ -1,3 +1,4 @@
+import crypto from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
 import { getDb } from "./db";
@@ -10,12 +11,24 @@ export function exportsDir(projectId: string): string {
   return dir;
 }
 
-/** Copy a stored asset to data/exports/<project>/<name><ext>. Existing files get a numeric suffix (never overwritten). */
+const sameBytes = (a: string, b: string) => {
+  const sa = fs.statSync(a);
+  const sb = fs.statSync(b);
+  return sa.size === sb.size && crypto.createHash("sha256").update(fs.readFileSync(a)).digest("hex") === crypto.createHash("sha256").update(fs.readFileSync(b)).digest("hex");
+};
+
+/**
+ * Copy a stored asset to data/exports/<project>/<name><ext>. Idempotent: identical content reuses the existing
+ * file; different content gets a -v2, -v3… suffix (an export is never overwritten).
+ */
 export function exportDeliverable(projectId: string, file: string, name: string): string {
   const dir = exportsDir(projectId);
   const ext = path.extname(file);
   let target = resolveInside(dir, `${safeFileName(name)}${ext}`);
-  for (let i = 2; fs.existsSync(target); i++) target = resolveInside(dir, `${safeFileName(name)}-v${i}${ext}`);
+  for (let i = 2; fs.existsSync(target); i++) {
+    if (sameBytes(file, target)) return target;
+    target = resolveInside(dir, `${safeFileName(name)}-v${i}${ext}`);
+  }
   fs.copyFileSync(file, target);
   return target;
 }

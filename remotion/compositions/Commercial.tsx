@@ -48,12 +48,12 @@ const TextBlock: React.FC<{ scene: CommercialScene; palette: Palette; dark: bool
       )}
       {scene.headline && (
         <Reveal delay={4}>
-          <div style={{ color, fontWeight: 700, fontSize: 7.2 * u * size, lineHeight: 1.25, textShadow: dark ? "0 2px 18px rgba(0,0,0,.35)" : "none" }}>{scene.headline}</div>
+          <div style={{ color, fontWeight: 700, fontSize: 7.2 * u * size, lineHeight: 1.25, whiteSpace: "pre-line", textShadow: dark ? "0 2px 18px rgba(0,0,0,.35)" : "none" }}>{scene.headline}</div>
         </Reveal>
       )}
       {scene.body && (
         <Reveal delay={9}>
-          <div style={{ color, opacity: 0.86, fontWeight: 400, fontSize: 3.6 * u * size, lineHeight: 1.5 }}>{scene.body}</div>
+          <div style={{ color, opacity: 0.86, fontWeight: 400, fontSize: 3.6 * u * size, lineHeight: 1.5, whiteSpace: "pre-line" }}>{scene.body}</div>
         </Reveal>
       )}
     </div>

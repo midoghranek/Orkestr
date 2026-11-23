@@ -13,8 +13,10 @@ import { AdapterError, normalizeError, type ExecContext, type ExecResult } from 
 import { getSettings } from "../settings";
 import { getNodeDef, isPaidNode, type InVal, type ResolvedInputs } from "./node-types";
 import { downstreamOf, validateGraph } from "./validate";
+import { sourceHash as remotionSourceHash } from "../adapters/remotion";
 
-export const ENGINE_VERSION = 1;
+/** Bump when a node type's behaviour changes, so cached results from older code are not reused. */
+export const ENGINE_VERSION = 2;
 const HEARTBEAT_MS = 5_000;
 const STALE_MS = 30_000;
 const TERMINAL: NodeStatus[] = ["completed", "failed", "cancelled", "skipped"];
@@ -265,7 +267,10 @@ export class Engine {
     const ins = Object.fromEntries(
       Object.entries(inputs).map(([k, list]) => [k, list.map((v) => (v.assetId ? `sha:${(v.meta?.sha256 as string) ?? v.assetId}` : `val:${sha256(stableStringify(v.value))}`))]),
     );
-    return sha256(stableStringify({ engine: ENGINE_VERSION, type, params, inputs: ins }));
+    // Remotion renders also depend on the composition source: hash it in so editing a composition invalidates renders.
+    const def = getNodeDef(type);
+    const code = [def?.capability, ...(def?.alsoRequires ?? [])].some((c) => c?.startsWith("remotion.")) ? remotionSourceHash() : undefined;
+    return sha256(stableStringify({ engine: ENGINE_VERSION, type, params, inputs: ins, code }));
   }
 
   /** Promote/skip/approve nodes of a run and update its status. */

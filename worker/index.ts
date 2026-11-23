@@ -21,6 +21,12 @@ async function main() {
   console.log(`[worker] ${engine.workerId} ready (concurrency ${engine.concurrency})`);
 
   const planTimer = setInterval(() => void processPlans(), 1000);
+  const beat = () =>
+    getDb()
+      .prepare("INSERT INTO settings (key, value_json, updated_at) VALUES ('__worker_heartbeat', ?, ?) ON CONFLICT(key) DO UPDATE SET value_json=excluded.value_json, updated_at=excluded.updated_at")
+      .run(JSON.stringify(engine.workerId), Date.now());
+  beat();
+  const beatTimer = setInterval(beat, 5000);
   // Re-run discovery every 10 minutes so health reflects installs/credentials added while running.
   const discTimer = setInterval(() => void runDiscovery().catch(() => undefined), 10 * 60_000);
   // Allow the UI to request a refresh.
@@ -38,6 +44,7 @@ async function main() {
     stopping = true;
     console.log(`[worker] ${sig}: stopping (running jobs are cancelled and will be retried on next start)`);
     clearInterval(planTimer);
+    clearInterval(beatTimer);
     clearInterval(discTimer);
     clearInterval(refreshTimer);
     await engine.stop();

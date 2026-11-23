@@ -1,0 +1,53 @@
+{
+  "id": "social-reel",
+  "name": "Social Reel",
+  "description": "15 s vertical (9:16) reel from brand visuals with punchy on-screen lines and an end card. Free: Remotion + FFmpeg only.",
+  "aspect": "9:16",
+  "durationS": 15,
+  "vars": [
+    { "name": "visualAssetIds", "label": "Visual asset ids (4, in order)", "type": "assetIds" },
+    { "name": "line1", "label": "Line 1", "type": "string" },
+    { "name": "line2", "label": "Line 2", "type": "string" },
+    { "name": "line3", "label": "Line 3", "type": "string" },
+    { "name": "line4", "label": "Line 4", "type": "string" },
+    { "name": "cta", "label": "End card", "type": "string" },
+    { "name": "logoReversedAssetId", "label": "Logo (dark background) asset id", "type": "assetId" },
+    { "name": "slug", "label": "Export name prefix", "type": "string", "default": "reel" }
+  ],
+  "graph": {
+    "version": 1,
+    "nodes": [
+      { "id": "v", "$each": "visualAssetIds", "type": "production.import", "label": "Visual", "params": {}, "position": { "x": 0, "y": 0 } },
+      { "id": "logo", "type": "production.import", "label": "Logo (reversed)", "params": { "assetId": "{{logoReversedAssetId}}" }, "position": { "x": 0, "y": 520 } },
+      {
+        "id": "compose",
+        "type": "production.compose",
+        "label": "Compose 9:16",
+        "params": {
+          "aspect": "9:16",
+          "fps": 30,
+          "direction": "rtl",
+          "scenes": [
+            { "id": "s1", "durationS": 3, "layout": "full-bleed", "visualIndex": 0, "headline": "{{line1}}" },
+            { "id": "s2", "durationS": 3, "layout": "full-bleed", "visualIndex": 1, "headline": "{{line2}}", "transition": "slide" },
+            { "id": "s3", "durationS": 3, "layout": "full-bleed", "visualIndex": 2, "headline": "{{line3}}", "transition": "slide" },
+            { "id": "s4", "durationS": 3, "layout": "full-bleed", "visualIndex": 3, "headline": "{{line4}}", "transition": "slide" },
+            { "id": "s5", "durationS": 3, "layout": "end-card", "headline": "{{cta}}", "visual": null }
+          ]
+        },
+        "position": { "x": 300, "y": 200 }
+      },
+      { "id": "qa", "type": "production.qa", "label": "QA", "params": { "expectWidth": 1080, "expectHeight": 1920, "expectFps": 30, "minDurationS": 14.5, "maxDurationS": 15.5, "requireAudio": false }, "position": { "x": 600, "y": 120 } },
+      { "id": "approve", "type": "logic.approval", "label": "Approve", "params": { "title": "Approve the reel" }, "position": { "x": 900, "y": 200 } },
+      { "id": "export", "type": "production.export", "label": "Export", "params": { "name": "{{slug}}-social-9x16" }, "position": { "x": 1200, "y": 200 } }
+    ],
+    "edges": [
+      { "id": "e1", "source": "v", "sourceHandle": "asset", "target": "compose", "targetHandle": "visuals" },
+      { "id": "e2", "source": "logo", "sourceHandle": "asset", "target": "compose", "targetHandle": "logo" },
+      { "id": "e3", "source": "compose", "sourceHandle": "video", "target": "qa", "targetHandle": "video" },
+      { "id": "e4", "source": "compose", "sourceHandle": "video", "target": "approve", "targetHandle": "in" },
+      { "id": "e5", "source": "qa", "sourceHandle": "report", "target": "approve", "targetHandle": "in" },
+      { "id": "e6", "source": "approve", "sourceHandle": "out", "target": "export", "targetHandle": "asset" }
+    ]
+  }
+}

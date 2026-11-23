@@ -2,7 +2,7 @@ import { z } from "zod";
 import type { Graph, Scene } from "@/shared/schema";
 import { GraphSchema } from "@/shared/schema";
 import { getDb, json, tx } from "./db";
-import { newId } from "./util/ids";
+import { newId, onlyProvided } from "./util/ids";
 
 export const ProjectSettingsSchema = z.object({
   /** Public URL of the product to capture real UI from. */
@@ -113,10 +113,11 @@ export function listProjects(): (Project & { stats: { workflows: number; runs: n
 export const ProjectPatchSchema = NewProjectSchema.partial().extend({ status: z.enum(["draft", "active", "archived"]).optional() });
 
 export function updateProject(id: string, patch: z.input<typeof ProjectPatchSchema>): Project {
-  const p = ProjectPatchSchema.parse(patch);
+  const p = onlyProvided(patch, ProjectPatchSchema.parse(patch));
   const cur = getProject(id);
   if (!cur) throw new Error("project not found");
-  const next = { ...cur, ...p, settings: p.settings ? ProjectSettingsSchema.parse({ ...cur.settings, ...p.settings }) : cur.settings };
+  const rawSettings = (patch as { settings?: unknown }).settings;
+  const next = { ...cur, ...p, settings: p.settings ? ProjectSettingsSchema.parse({ ...cur.settings, ...onlyProvided(rawSettings, p.settings) }) : cur.settings };
   getDb()
     .prepare("UPDATE projects SET name=?, description=?, brief=?, budget_usd=?, status=?, settings_json=?, updated_at=? WHERE id=?")
     .run(next.name, next.description, next.brief, next.budgetUsd, next.status, JSON.stringify(next.settings), Date.now(), cur.id);
@@ -190,7 +191,10 @@ export function saveWorkflow(id: string, patch: { name?: string; graph?: unknown
 }
 
 export function deleteWorkflow(id: string): void {
-  getDb().prepare("DELETE FROM workflows WHERE id = ?").run(id);
+  const db = getDb();
+  // Approvals/costs reference runs without a foreign key; drop pending approvals with the runs they gate.
+  db.prepare("DELETE FROM approvals WHERE run_id IN (SELECT id FROM runs WHERE workflow_id = ?)").run(id);
+  db.prepare("DELETE FROM workflows WHERE id = ?").run(id);
 }
 
 /* ------------------------------ Scenes (storyboard) ------------------------------ */

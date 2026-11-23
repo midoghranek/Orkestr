@@ -7,7 +7,9 @@ import { getAdapter, readyCapabilities, capabilitySpec } from "../adapters/regis
 import { AdapterError, type ArtifactOut, type ExecContext, type ExecResult } from "../adapters/types";
 import { getAsset, importFile } from "../assets";
 import { parseSrt } from "../adapters/whisper";
+import { fileRef } from "../adapters/remotion";
 import { getSettings } from "../settings";
+import { isUnderAny } from "../util/paths";
 import { CommercialPropsSchema, CommercialSceneSchema, PaletteSchema } from "../../../remotion/schema";
 
 /** A value flowing into a node input: an asset reference or an inline value. */
@@ -189,7 +191,7 @@ const posterNode: NodeDef<{ aspect: z.infer<typeof Aspect>; kicker: string; head
     return call("remotion.still", {
       composition: "Poster",
       format: params.format,
-      props: { ...size, direction: params.direction, palette: PaletteSchema.parse(params.palette ?? {}), background: bg ? { $file: bg } : null, logo: logo ? { $file: logo } : null, kicker: params.kicker, headline: params.headline, sub: params.sub, cta: params.cta },
+      props: { ...size, direction: params.direction, palette: PaletteSchema.parse(params.palette ?? {}), background: bg ? fileRef(bg) : null, logo: logo ? fileRef(logo) : null, kicker: params.kicker, headline: params.headline, sub: params.sub, cta: params.cta },
     });
   },
 };
@@ -263,7 +265,7 @@ const vfxNode: NodeDef<{ project?: string; template?: string; values?: Record<st
   capability: "effectcraft.render",
   run: async ({ params, call }) => {
     const roots = getSettings().importRoots;
-    for (const f of [params.project, params.template]) if (f && !roots.some((r) => path.resolve(f).startsWith(path.resolve(r)))) throw new AdapterError("INVALID_INPUT", `${f} is outside the allowed import folders`);
+    for (const f of [params.project, params.template]) if (f && !isUnderAny(f, roots)) throw new AdapterError("INVALID_INPUT", `${f} is outside the allowed import folders`);
     return call("effectcraft.render", params);
   },
 };
@@ -363,8 +365,28 @@ const composeParams = z.object({
   fps: z.number().int().min(12).max(60).default(30),
   direction: z.enum(["rtl", "ltr"]).default("rtl"),
   palette: z.record(z.string(), z.string()).optional(),
-  /** Scene list. If a storyboard is connected, its scenes fill any field left empty here. */
-  scenes: z.array(CommercialSceneSchema.partial().extend({ visualIndex: z.number().int().min(0).optional() })).default([]),
+  /**
+   * Scene list. If a storyboard is connected, its scenes fill any field left empty here.
+   * Explicit optional fields (no defaults): Zod's .partial() would keep the composition defaults
+   * (e.g. visual: null) and silently drop every wired visual.
+   */
+  scenes: z
+    .array(
+      z.object({
+        id: z.string().optional(),
+        durationS: z.number().min(0.3).max(120).optional(),
+        layout: z.enum(["full-bleed", "split", "title", "ui-showcase", "end-card"]).optional(),
+        /** null = no visual (title card); omit to use the wired visual at visualIndex. */
+        visual: z.object({ fit: z.enum(["cover", "contain"]).optional(), kenBurns: z.boolean().optional(), frame: z.enum(["none", "browser", "phone"]).optional(), scroll: z.boolean().optional(), startFromS: z.number().min(0).optional() }).nullable().optional(),
+        visualIndex: z.number().int().min(0).optional(),
+        kicker: z.string().max(200).optional(),
+        headline: z.string().max(400).optional(),
+        body: z.string().max(600).optional(),
+        transition: z.enum(["fade", "slide", "none"]).optional(),
+        placeholder: z.boolean().optional(),
+      }),
+    )
+    .default([]),
   voiceoverDelayS: z.number().min(0).max(10).default(0.4),
   musicVolume: z.number().min(0).max(1).default(0.22),
   showCaptions: z.boolean().default(true),
@@ -403,12 +425,13 @@ const composeNode: NodeDef<z.infer<typeof composeParams>> = {
         id: o.id ?? `s${i + 1}`,
         durationS: o.durationS ?? ps?.durationS ?? 4,
         layout: o.layout ?? (i === count - 1 ? "end-card" : "full-bleed"),
-        visual: o.visual === null ? null : v?.path ? { type: isVideo ? "video" : "image", ...o.visual, src: { $file: v.path } as unknown as string } : null,
+        visual: o.visual === null ? null : v?.path ? { type: isVideo ? "video" : "image", ...o.visual, src: fileRef(v.path) } : null,
         kicker: o.kicker ?? "",
         headline: o.headline ?? ps?.onScreenText ?? "",
         body: o.body ?? "",
         transition: o.transition ?? "fade",
-        placeholder: o.placeholder ?? (v?.meta?.placeholder === true),
+        // A placeholder asset always marks the scene, whatever the plan assumed about its source.
+        placeholder: o.placeholder === true || v?.meta?.placeholder === true,
       });
     });
     if (!scenes.length) throw new AdapterError("INVALID_INPUT", "no scenes: connect visuals or a storyboard, or define scenes");
@@ -427,11 +450,11 @@ const composeNode: NodeDef<z.infer<typeof composeParams>> = {
       direction: params.direction,
       palette: PaletteSchema.parse(params.palette ?? {}),
       scenes,
-      logo: logos[0] ? ({ $file: logos[0] } as unknown as string) : null,
-      logoReversed: logos[1] ? ({ $file: logos[1] } as unknown as string) : null,
-      voiceover: vo ? ({ $file: vo } as unknown as string) : null,
+      logo: logos[0] ? (fileRef(logos[0])) : null,
+      logoReversed: logos[1] ? (fileRef(logos[1])) : null,
+      voiceover: vo ? (fileRef(vo)) : null,
       voiceoverDelayS: params.voiceoverDelayS,
-      music: music ? ({ $file: music } as unknown as string) : null,
+      music: music ? (fileRef(music)) : null,
       musicVolume: params.musicVolume,
       captions,
       showCaptions: params.showCaptions,
@@ -454,7 +477,7 @@ const loopComposeNode: NodeDef<{ aspect: z.infer<typeof Aspect>; durationS: numb
     const logo = firstPath(inputs, "logo", false);
     return call("remotion.render", {
       composition: "Loop",
-      props: { ...ASPECT_SIZES[params.aspect], fps: 30, durationS: params.durationS, scrim: params.scrim, palette: PaletteSchema.parse(params.palette ?? {}), images: allPaths(inputs, "images").map((p) => ({ $file: p })), logo: logo ? { $file: logo } : null },
+      props: { ...ASPECT_SIZES[params.aspect], fps: 30, durationS: params.durationS, scrim: params.scrim, palette: PaletteSchema.parse(params.palette ?? {}), images: allPaths(inputs, "images").map((p) => (fileRef(p))), logo: logo ? fileRef(logo) : null },
     });
   },
 };
@@ -556,11 +579,13 @@ const exportNode: NodeDef<{ name: string; deliverable: string }> = {
   params: z.object({ name: z.string().regex(/^[A-Za-z0-9_.-]{1,100}$/, "file-safe name, no extension"), deliverable: z.string().max(120).default("") }),
   capability: null,
   run: async ({ params, inputs, exec }) => {
-    const v = inputs.asset?.[0];
-    if (!v?.path) throw new AdapterError("INVALID_INPUT", "nothing to export");
+    // Every media input is exported (e.g. MP4 + WebM of a loop); QA reports and other JSON are not deliverables.
+    const media = (inputs.asset ?? []).filter((v) => v.path && ["video", "image", "audio", "subtitle"].includes(v.kind ?? ""));
+    if (!media.length) throw new AdapterError("INVALID_INPUT", "nothing to export");
     const { exportDeliverable } = await import("../exports");
-    const out = exportDeliverable(exec.projectId, v.path, params.name);
-    return { artifacts: [], values: { asset: { assetId: v.assetId, exportedTo: out, deliverable: params.deliverable || params.name } } };
+    const files = media.map((v) => ({ assetId: v.assetId, exportedTo: exportDeliverable(exec.projectId, v.path!, params.name) }));
+    exec.log("info", `exported ${files.map((f) => path.basename(f.exportedTo)).join(", ")}`);
+    return { artifacts: [], values: { asset: { assetId: media[0].assetId, files, deliverable: params.deliverable || params.name } } };
   },
 };
 

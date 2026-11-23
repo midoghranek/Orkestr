@@ -248,20 +248,67 @@ export function planToGraph(plan: DirectorPlan, project: Project, opts: BuildOpt
   const logo = opts.logoAssetId ? b.add("production.import", "logo", { assetId: opts.logoAssetId }, 1, "Logo") : null;
   const logoRev = opts.logoReversedAssetId ? b.add("production.import", "logo_rev", { assetId: opts.logoReversedAssetId }, 1, "Logo (reversed)") : null;
 
-  // 3) One composition per deliverable (aspect variants reuse every upstream node).
+  // 3) One production branch per deliverable (aspect variants reuse every upstream node).
+  // Portrait deliverables get real mobile captures of the product (desktop captures crop badly in a phone frame).
+  const portraitIds = new Map<number, string>();
+  const visualsFor = (a: Aspect): (string | null)[] =>
+    visualIds.map((v, i) => {
+      if (!v || (a !== "9:16" && a !== "4:5") || b.nodes.find((n) => n.id === v)?.type !== "image.capture") return v;
+      if (!portraitIds.has(i)) {
+        const src = b.nodes.find((n) => n.id === v)!;
+        const id = b.add("image.capture", `${v}_m`, { ...src.params, width: 430, height: 932, deviceScaleFactor: 3, mobile: true, scrollTo: Math.round(i * 900) }, 0, `${src.label ?? v} (mobile)`, src.sceneId);
+        portraitIds.set(i, id);
+      }
+      return portraitIds.get(i)!;
+    });
+  const stillsFor = (a: Aspect) => visualsFor(a).filter((v): v is string => !!v);
+  const stillSources = visualIds.filter((v): v is string => !!v);
+  const handleOf = (id: string) => (b.nodes.find((n) => n.id === id)?.type === "image.capture" ? "image" : "asset");
+  const lastLines = (plan.scenes[plan.scenes.length - 1]?.onScreenText ?? "").split("\n").map((s) => s.trim()).filter(Boolean);
   plan.deliverables.forEach((d, di) => {
     const suffix = di === 0 ? "" : `_${di + 1}`;
     const dAspect = d.aspect as Aspect;
+    const slugName = `${project.slug}-${d.name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "")}-${dAspect.replace(":", "x")}`;
+    const kind = /poster|still/i.test(d.name) || d.durationS <= 1 ? "poster" : /loop/i.test(d.name) ? "loop" : "cut";
+
+    if (kind === "poster") {
+      const bg = stillSources.find((v) => handleOf(v) === "asset") ?? stillSources[0];
+      const poster = b.add("image.poster", `poster${suffix}`, { aspect: dAspect, headline: lastLines[lastLines.length - 1] ?? plan.title, sub: lastLines.slice(1, -1).join(" · "), kicker: project.settings.brandName ?? "", direction: opts.direction ?? "rtl", palette: opts.palette }, 5, `Poster · ${d.name}`);
+      if (bg) b.link(bg, handleOf(bg), poster, "background");
+      if (logoRev) b.link(logoRev, "asset", poster, "logo");
+      const exp = b.add("production.export", `export${suffix}`, { name: slugName, deliverable: d.name }, 8, `Export · ${d.name}`);
+      b.link(poster, "image", exp, "asset");
+      return;
+    }
+
+    if (kind === "loop") {
+      // Text-free brand loop: stills only (videos can't feed an image port), crossfaded seamless, muted MP4 + WebM.
+      const loop = b.add("production.loop", `loopcomp${suffix}`, { aspect: dAspect, durationS: d.durationS + 1, scrim: 0.15, palette: opts.palette }, 5, `Loop · ${d.name}`);
+      stillsFor(dAspect).forEach((v) => b.link(v, handleOf(v), loop, "images"));
+      const seamless = b.add("video.loop", `loop${suffix}`, { crossfadeS: 1, webm: true }, 6, `Seamless · ${d.name}`);
+      b.link(loop, "video", seamless, "video");
+      const s2 = ASPECT_SIZES[dAspect];
+      const qa = b.add("production.qa", `qa${suffix}`, { expectWidth: s2.width, expectHeight: s2.height, expectFps: 30, minDurationS: d.durationS - 0.6, maxDurationS: d.durationS + 0.6, requireAudio: false }, 7, `QA · ${d.name}`);
+      b.link(seamless, "video", qa, "video");
+      const gate = b.add("logic.approval", `approve${suffix}`, { title: `Approve ${d.name}`, instructions: "Check the loop point (end → start) is invisible." }, 7, `Approve · ${d.name}`);
+      b.link(seamless, "video", gate, "in");
+      b.link(seamless, "webm", gate, "in");
+      b.link(qa, "report", gate, "in");
+      const exp = b.add("production.export", `export${suffix}`, { name: slugName, deliverable: d.name }, 8, `Export · ${d.name}`);
+      b.link(gate, "out", exp, "asset");
+      return;
+    }
     const scale = d.durationS / main.durationS;
+    const vis = visualsFor(dAspect);
     const scenes = plan.scenes.map((s, i) => {
-      const vIndex = visualIds.slice(0, i + 1).filter(Boolean).length - 1;
+      const vIndex = vis.slice(0, i + 1).filter(Boolean).length - 1;
       const isLast = i === plan.scenes.length - 1;
       return {
         id: `s${i + 1}`,
         durationS: Math.max(0.8, Math.round(s.durationS * scale * 10) / 10),
-        layout: isLast ? "end-card" : visualIds[i] ? (s.visualSource === "ui-capture" ? "ui-showcase" : "full-bleed") : "title",
-        visualIndex: visualIds[i] ? vIndex : undefined,
-        visual: visualIds[i] ? undefined : null,
+        layout: isLast ? "end-card" : vis[i] ? (s.visualSource === "ui-capture" ? "ui-showcase" : "full-bleed") : "title",
+        visualIndex: vis[i] ? vIndex : undefined,
+        visual: vis[i] ? undefined : null,
         headline: s.onScreenText,
         placeholder: ["generated-video", "generated-image", "stock", "placeholder"].includes(s.visualSource),
       };
@@ -270,7 +317,7 @@ export function planToGraph(plan: DirectorPlan, project: Project, opts: BuildOpt
     // Fix rounding drift on the last scene so the cut lands on the target length.
     scenes[scenes.length - 1].durationS = Math.max(0.8, Math.round((scenes[scenes.length - 1].durationS + (d.durationS - total)) * 10) / 10);
     const comp = b.add("production.compose", `compose${suffix}`, { aspect: dAspect, fps: 30, direction: opts.direction ?? "rtl", palette: opts.palette, scenes, showCaptions: !!subsNode, maxDurationS: d.durationS + 0.5 }, 5, `Compose · ${d.name}`);
-    visualIds.forEach((v) => v && b.link(v, v.startsWith("scene") && b.nodes.find((n) => n.id === v)?.type === "image.capture" ? "image" : "asset", comp, "visuals"));
+    vis.forEach((v) => v && b.link(v, handleOf(v), comp, "visuals"));
     if (voNode && Math.abs(scale - 1) < 0.01) b.link(voNode, voNode === "vo_review" ? "out" : "asset", comp, "voiceover");
     if (musicNode) b.link(musicNode, "asset", comp, "music");
     if (subsNode && Math.abs(scale - 1) < 0.01) b.link(subsNode, "out", comp, "subtitles");
