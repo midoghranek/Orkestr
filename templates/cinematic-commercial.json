@@ -1,0 +1,56 @@
+{
+  "id": "cinematic-commercial",
+  "name": "Cinematic Commercial",
+  "description": "30–35 s brand commercial: AI Director storyboard, brand photography, a real UI capture, paid voiceover with pronunciation review, Whisper captions with review, Remotion composition, QA, approval and export.",
+  "aspect": "16:9",
+  "durationS": 32,
+  "vars": [
+    { "name": "brief", "label": "Creative brief", "type": "text" },
+    { "name": "productUrl", "label": "Live product URL (for real UI capture)", "type": "url" },
+    { "name": "heroAssetIds", "label": "Brand photo/video asset ids (in scene order)", "type": "assetIds" },
+    { "name": "logoAssetId", "label": "Logo (light background) asset id", "type": "assetId" },
+    { "name": "logoReversedAssetId", "label": "Logo (dark background) asset id", "type": "assetId" },
+    { "name": "voiceId", "label": "ElevenLabs voice id", "type": "string", "help": "From your ElevenLabs voice list" },
+    { "name": "language", "label": "Caption language (ISO 639-1)", "type": "string", "default": "ar" },
+    { "name": "slug", "label": "Export name prefix", "type": "string", "default": "commercial" }
+  ],
+  "graph": {
+    "version": 1,
+    "nodes": [
+      { "id": "brief", "type": "logic.text", "label": "Brief", "params": { "text": "{{brief}}" }, "position": { "x": 0, "y": 0 } },
+      { "id": "director", "type": "ai.director", "label": "Creative Director", "params": { "maxBudgetUsd": 3 }, "position": { "x": 300, "y": 0 } },
+      { "id": "hero", "$each": "heroAssetIds", "type": "production.import", "label": "Brand visual", "params": {}, "position": { "x": 0, "y": 160 } },
+      { "id": "ui", "type": "image.capture", "label": "Real product UI", "params": { "url": "{{productUrl}}", "width": 1440, "height": 900, "deviceScaleFactor": 2 }, "position": { "x": 300, "y": 160 } },
+      { "id": "logo", "type": "production.import", "label": "Logo", "params": { "assetId": "{{logoAssetId}}" }, "position": { "x": 300, "y": 300 } },
+      { "id": "logo_rev", "type": "production.import", "label": "Logo (reversed)", "params": { "assetId": "{{logoReversedAssetId}}" }, "position": { "x": 300, "y": 420 } },
+      { "id": "vo", "type": "audio.voiceover", "label": "Voiceover", "params": { "voiceId": "{{voiceId}}", "modelId": "eleven_multilingual_v2" }, "position": { "x": 600, "y": 0 } },
+      { "id": "vo_review", "type": "logic.approval", "label": "Pronunciation review", "params": { "title": "Listen to the voiceover", "instructions": "Check brand pronunciation and natural delivery before captions and composition." }, "position": { "x": 900, "y": 0 } },
+      { "id": "captions", "type": "audio.transcribe", "label": "Captions", "params": { "language": "{{language}}", "maxChars": 42 }, "position": { "x": 1200, "y": 0 } },
+      { "id": "captions_review", "type": "logic.approval", "label": "Caption review", "params": { "title": "Proofread captions" }, "position": { "x": 1500, "y": 0 } },
+      { "id": "compose", "type": "production.compose", "label": "Compose 16:9", "params": { "aspect": "16:9", "fps": 30, "direction": "rtl", "maxDurationS": 36 }, "position": { "x": 1800, "y": 160 } },
+      { "id": "qa", "type": "production.qa", "label": "Technical QA", "params": { "expectWidth": 1920, "expectHeight": 1080, "expectFps": 30, "minDurationS": 29, "maxDurationS": 36 }, "position": { "x": 2100, "y": 100 } },
+      { "id": "approve", "type": "logic.approval", "label": "Final approval", "params": { "title": "Approve the commercial" }, "position": { "x": 2400, "y": 160 } },
+      { "id": "export", "type": "production.export", "label": "Export", "params": { "name": "{{slug}}-commercial-16x9" }, "position": { "x": 2700, "y": 160 } },
+      { "id": "poster", "type": "production.poster_frame", "label": "Poster frame", "params": { "timeS": 2 }, "position": { "x": 2100, "y": 300 } }
+    ],
+    "edges": [
+      { "id": "e1", "source": "brief", "sourceHandle": "text", "target": "director", "targetHandle": "brief" },
+      { "id": "e2", "source": "director", "sourceHandle": "script", "target": "vo", "targetHandle": "script" },
+      { "id": "e3", "source": "vo", "sourceHandle": "audio", "target": "vo_review", "targetHandle": "in" },
+      { "id": "e4", "source": "vo_review", "sourceHandle": "out", "target": "captions", "targetHandle": "audio" },
+      { "id": "e5", "source": "captions", "sourceHandle": "subtitles", "target": "captions_review", "targetHandle": "in" },
+      { "id": "e6", "source": "director", "sourceHandle": "storyboard", "target": "compose", "targetHandle": "storyboard" },
+      { "id": "e7", "source": "hero", "sourceHandle": "asset", "target": "compose", "targetHandle": "visuals" },
+      { "id": "e8", "source": "ui", "sourceHandle": "image", "target": "compose", "targetHandle": "visuals" },
+      { "id": "e9", "source": "vo_review", "sourceHandle": "out", "target": "compose", "targetHandle": "voiceover" },
+      { "id": "e10", "source": "captions_review", "sourceHandle": "out", "target": "compose", "targetHandle": "subtitles" },
+      { "id": "e11", "source": "logo", "sourceHandle": "asset", "target": "compose", "targetHandle": "logo" },
+      { "id": "e12", "source": "logo_rev", "sourceHandle": "asset", "target": "compose", "targetHandle": "logo" },
+      { "id": "e13", "source": "compose", "sourceHandle": "video", "target": "qa", "targetHandle": "video" },
+      { "id": "e14", "source": "compose", "sourceHandle": "video", "target": "approve", "targetHandle": "in" },
+      { "id": "e15", "source": "qa", "sourceHandle": "report", "target": "approve", "targetHandle": "in" },
+      { "id": "e16", "source": "approve", "sourceHandle": "out", "target": "export", "targetHandle": "asset" },
+      { "id": "e17", "source": "compose", "sourceHandle": "video", "target": "poster", "targetHandle": "video" }
+    ]
+  }
+}
