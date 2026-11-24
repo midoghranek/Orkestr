@@ -2,6 +2,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { z } from "zod";
 import { allowExecutable, runAllowed, runFile, which } from "../util/proc";
+import { REVIEW_SYSTEM, WRITE_SYSTEM } from "../prompts";
 import {
   AdapterError,
   type CapabilitySpec,
@@ -176,7 +177,7 @@ export class ClaudeAdapter implements ToolAdapter {
       });
       ctx.progress(0.2, "AI reviewing frames");
       const res = await this.structured({
-        system: "You are a meticulous production QA reviewer for commercials. Inspect the provided frames with the Read tool. Report only issues you can actually see. Do not invent problems.",
+        system: REVIEW_SYSTEM,
         prompt: `Brief:\n${p.brief}\n\nChecklist:\n${p.checklist.map((c) => `- ${c}`).join("\n") || "- visual artifacts\n- branding\n- text legibility\n- subtitle problems"}\n\nFrames in this directory: ${names.join(", ")}. Read each one, then return findings.`,
         schema: Findings,
         model: p.model ?? "sonnet",
@@ -195,7 +196,7 @@ export class ClaudeAdapter implements ToolAdapter {
     if (operation === "write") {
       const p = z.object({ instruction: z.string().min(1).max(8000), context: z.string().max(20000).default(""), model: z.string().optional(), maxBudgetUsd: z.number().max(10).default(1) }).parse(params);
       const res = await this.structured({
-        system: "You are a senior copywriter. Return only the requested text in the `text` field. Do not invent product capabilities that are not in the context.",
+        system: WRITE_SYSTEM,
         prompt: `${p.instruction}\n\nContext:\n${p.context}`,
         schema: z.object({ text: z.string() }),
         model: p.model ?? "sonnet",
