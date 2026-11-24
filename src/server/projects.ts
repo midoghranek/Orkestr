@@ -16,6 +16,24 @@ export const ProjectSettingsSchema = z.object({
   verifiedClaims: z.array(z.string().max(400)).max(60).default([]),
   brandNotes: z.string().max(4000).optional(),
   voiceId: z.string().max(60).optional(),
+  /**
+   * What Orkestr read from the product website (untrusted page content). Shown to the user to confirm; lines only
+   * become verified claims once the user confirms them.
+   */
+  website: z
+    .object({
+      url: z.string().max(400),
+      title: z.string().max(200).default(""),
+      description: z.string().max(400).default(""),
+      headings: z.array(z.string().max(140)).max(16).default([]),
+      ctas: z.array(z.string().max(40)).max(8).default([]),
+      dir: z.enum(["rtl", "ltr"]).default("ltr"),
+      lang: z.string().max(20).default(""),
+      inspectedAt: z.number().optional(),
+    })
+    .optional(),
+  /** The user confirmed they own or may use the brand materials found on the website (logo, screenshots). */
+  websiteRightsConfirmed: z.boolean().optional(),
 });
 export type ProjectSettings = z.infer<typeof ProjectSettingsSchema>;
 
@@ -97,7 +115,14 @@ export function getProject(idOrSlug: string): Project | undefined {
   return r ? fromRow(r) : undefined;
 }
 
-export function listProjects(): (Project & { stats: { workflows: number; runs: number; assets: number; lastRunStatus: string | null } })[] {
+export interface ProjectCard {
+  /** Latest rendered piece (or any visual) to show as the project's thumbnail. */
+  cover: { id: string; kind: string } | null;
+  /** Status of the latest creation-first production, if any. */
+  production: { id: string; status: string; updatedAt: number } | null;
+}
+
+export function listProjects(): (Project & ProjectCard & { stats: { workflows: number; runs: number; assets: number; lastRunStatus: string | null } })[] {
   const rows = getDb().prepare("SELECT * FROM projects ORDER BY updated_at DESC").all() as unknown as ProjectRow[];
   return rows.map((r) => {
     const s = getDb()
@@ -106,7 +131,14 @@ export function listProjects(): (Project & { stats: { workflows: number; runs: n
                 (SELECT status FROM runs WHERE project_id = @id ORDER BY created_at DESC LIMIT 1) ls`,
       )
       .get({ id: r.id }) as { w: number; r: number; a: number; ls: string | null };
-    return { ...fromRow(r), stats: { workflows: s.w, runs: s.r, assets: s.a, lastRunStatus: s.ls } };
+    const cover = (getDb()
+      .prepare(
+        `SELECT id, kind FROM assets WHERE project_id = ? AND kind IN ('video','image')
+         ORDER BY (json_extract(provenance_json, '$.nodeType') IN ('production.compose','production.loop','image.poster')) DESC, (kind = 'video') DESC, created_at DESC LIMIT 1`,
+      )
+      .get(r.id) as { id: string; kind: string } | undefined) ?? null;
+    const prod = (getDb().prepare("SELECT id, status, updated_at FROM productions WHERE project_id = ? ORDER BY created_at DESC LIMIT 1").get(r.id) as { id: string; status: string; updated_at: number } | undefined) ?? null;
+    return { ...fromRow(r), cover, production: prod ? { id: prod.id, status: prod.status, updatedAt: prod.updated_at } : null, stats: { workflows: s.w, runs: s.r, assets: s.a, lastRunStatus: s.ls } };
   });
 }
 

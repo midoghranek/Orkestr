@@ -213,4 +213,33 @@ CREATE TABLE plans (
 );
 `,
   },
+  {
+    // Creation-first studio: a production coordinates research → plan → render → review on top of the
+    // existing workflow engine. Plans gain versioning (parent + source) for conversational edits. Additive only:
+    // existing projects, plans, workflows and runs are untouched.
+    version: 2,
+    sql: `
+CREATE TABLE productions (
+  id TEXT PRIMARY KEY,
+  project_id TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+  status TEXT NOT NULL,
+  recipe TEXT NOT NULL,
+  intent_json TEXT NOT NULL DEFAULT '{}',
+  research_run_id TEXT,
+  plan_id TEXT,
+  workflow_id TEXT,
+  run_id TEXT,
+  budget_usd REAL NOT NULL DEFAULT 0,
+  error TEXT,
+  created_at INTEGER NOT NULL,
+  updated_at INTEGER NOT NULL
+);
+CREATE INDEX productions_project ON productions(project_id, created_at);
+CREATE INDEX productions_status ON productions(status);
+ALTER TABLE plans ADD COLUMN parent_plan_id TEXT;
+ALTER TABLE plans ADD COLUMN source TEXT NOT NULL DEFAULT 'ai';
+ALTER TABLE plans ADD COLUMN note TEXT NOT NULL DEFAULT '';
+ALTER TABLE plans ADD COLUMN constraints TEXT NOT NULL DEFAULT '';
+`,
+  },
 ];

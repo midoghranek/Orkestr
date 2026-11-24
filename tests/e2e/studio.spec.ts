@@ -14,9 +14,41 @@ function watchErrors(page: Page) {
 
 const shot = (page: Page, name: string) => page.screenshot({ path: `test-results/screens/${name}.png`, fullPage: false });
 
-test("dashboard shows studio status, approvals and projects", async ({ page }) => {
+/** Studio Pro is a per-browser preference; the technical screens below are tested in Pro mode. */
+const pro = (page: Page) => page.addInitScript(() => window.localStorage.setItem("orkestr.mode", "pro"));
+
+test("home is creation-first: prompt, recipes and recent work, no technical dashboard", async ({ page }) => {
   const errors = watchErrors(page);
   await page.goto("/");
+  await expect(page.getByRole("heading", { name: "What do you want to create today?" })).toBeVisible();
+  await expect(page.getByRole("button", { name: /Product commercial/ })).toBeVisible();
+  await expect(page.getByRole("link", { name: "Render queue" })).toHaveCount(0);
+  await expect(page.getByRole("switch", { name: "Studio Pro" })).toBeVisible();
+  await shot(page, "home");
+  expect(errors).toEqual([]);
+});
+
+test("a creation reaches a reviewable direction without any setup (free planner, no website)", async ({ page }) => {
+  const errors = watchErrors(page);
+  await page.goto("/");
+  await page.getByLabel("Describe what you want to create").fill("Announce the launch of our new seasonal menu");
+  // Wait for readiness to load: tests must never trigger a paid AI Director call.
+  const quick = page.getByRole("checkbox", { name: /Quick draft without AI/ });
+  await expect(quick.or(page.getByText(/AI Director isn.t set up/))).toBeVisible();
+  if (await quick.count()) await quick.check();
+  await page.getByRole("button", { name: "Create", exact: true }).click();
+  await expect(page.getByText("Ready to make it?")).toBeVisible();
+  // Nothing is invented: lines Orkestr has no words for are left for the user, and production waits for them.
+  await expect(page.getByText(/still need/)).toBeVisible();
+  await expect(page.getByRole("button", { name: "Make it", exact: true })).toBeDisabled();
+  await shot(page, "direction");
+  expect(errors).toEqual([]);
+});
+
+test("control room (Studio Pro) shows studio status, approvals and projects", async ({ page }) => {
+  const errors = watchErrors(page);
+  await pro(page);
+  await page.goto("/studio");
   await expect(page.getByRole("heading", { name: "Dashboard" })).toBeVisible();
   await expect(page.getByText("worker running")).toBeVisible();
   await expect(page.getByText("Needs your decision")).toBeVisible();
@@ -37,7 +69,8 @@ test("settings lists verified tools and honest gaps", async ({ page }) => {
 
 test("project overview, storyboard, assets and preview render for the demo project", async ({ page }) => {
   const errors = watchErrors(page);
-  await page.goto("/projects/acme-cafe");
+  await pro(page);
+  await page.goto("/projects/acme-cafe/overview");
   await expect(page.getByRole("heading", { name: "Acme Café (demo)" })).toBeVisible();
   await expect(page.getByText("Workflows")).toBeVisible();
   await shot(page, "project-overview");
@@ -62,6 +95,7 @@ test("project overview, storyboard, assets and preview render for the demo proje
 
 test("flow editor renders the demo graph and validates edits", async ({ page }) => {
   const errors = watchErrors(page);
+  await pro(page);
   await page.goto("/projects/acme-cafe/flows");
   await page.locator("main a[href*='/flows/wf_']").first().click();
   await expect(page.locator(".react-flow__node").first()).toBeVisible();
@@ -83,6 +117,7 @@ test("flow editor renders the demo graph and validates edits", async ({ page }) 
 
 test("render queue lists runs and pending approvals (read-only)", async ({ page }) => {
   const errors = watchErrors(page);
+  await pro(page);
   await page.goto("/queue");
   await expect(page.getByText(/approv/i).first()).toBeVisible();
   await expect(page.getByRole("heading", { name: "Runs" })).toBeVisible();

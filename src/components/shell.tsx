@@ -2,16 +2,40 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Clapperboard, LayoutDashboard, ListVideo, Settings } from "lucide-react";
+import { Clapperboard, LayoutDashboard, ListVideo, Settings, Sparkles, SlidersHorizontal } from "lucide-react";
 import { cn, Logo, Toaster } from "./ui";
 import { useApi, type OrkEvent } from "@/lib/api";
+import { useMode } from "@/lib/mode";
 
 const NAV = [
-  { href: "/", label: "Dashboard", short: "Home", icon: LayoutDashboard, match: (p: string) => p === "/" },
-  { href: "/projects", label: "Projects", short: "Projects", icon: Clapperboard, match: (p: string) => p.startsWith("/projects") },
-  { href: "/queue", label: "Render Queue", short: "Queue", icon: ListVideo, match: (p: string) => p.startsWith("/queue") },
-  { href: "/settings", label: "Settings", short: "Settings", icon: Settings, match: (p: string) => p.startsWith("/settings") },
+  { href: "/", label: "Create", short: "Create", icon: Sparkles, match: (p: string) => p === "/", pro: false },
+  { href: "/projects", label: "Projects", short: "Projects", icon: Clapperboard, match: (p: string) => p.startsWith("/projects"), pro: false },
+  { href: "/studio", label: "Control room", short: "Studio", icon: LayoutDashboard, match: (p: string) => p.startsWith("/studio"), pro: true },
+  { href: "/queue", label: "Render queue", short: "Queue", icon: ListVideo, match: (p: string) => p.startsWith("/queue"), pro: true },
+  { href: "/settings", label: "Setup", short: "Setup", icon: Settings, match: (p: string) => p.startsWith("/settings"), pro: false },
 ];
+
+/** Switch between Simple mode and Studio Pro. Same projects and engine; Pro reveals the technical tools. */
+export function ModeSwitch({ className, onInk = true }: { className?: string; onInk?: boolean }) {
+  const [mode, setMode] = useMode();
+  const pro = mode === "pro";
+  return (
+    <button
+      type="button"
+      role="switch"
+      aria-checked={pro}
+      onClick={() => setMode(pro ? "simple" : "pro")}
+      className={cn("flex w-full items-center gap-2.5 rounded-ctl border-2 px-3 py-2 text-left text-[13px] font-semibold", onInk ? "border-cream/15 text-cream hover:bg-ink-2" : "border-ink bg-panel text-ink hover:bg-white", className)}
+      title="Studio Pro shows the flow editor, render queue, storyboard and logs. Your work is the same in both modes."
+    >
+      <SlidersHorizontal className="size-4 shrink-0" aria-hidden />
+      <span className="flex-1">Studio Pro</span>
+      <span aria-hidden className={cn("relative h-5 w-9 shrink-0 rounded-full border-2 transition-colors", pro ? "border-accent bg-accent" : onInk ? "border-cream/40 bg-ink-2" : "border-ink bg-panel-2")}>
+        <span className={cn("absolute top-0.5 size-3 rounded-full transition-[left]", pro ? "left-[18px] bg-ink" : "left-0.5", !pro && (onInk ? "bg-cream/70" : "bg-ink"))} />
+      </span>
+    </button>
+  );
+}
 
 const onApproval = (e: OrkEvent) => e.type.startsWith("approval") || e.type.startsWith("node.") || e.type.startsWith("run.");
 
@@ -31,6 +55,8 @@ export function Shell({ children }: { children: React.ReactNode }) {
   const alive = sys?.worker.alive;
   const workerText = sys === undefined ? "Checking worker…" : alive ? "Worker running" : "Worker offline";
   const count = pending?.length ?? 0;
+  const [mode] = useMode();
+  const nav = NAV.filter((n) => !n.pro || mode === "pro");
 
   return (
     <div className="flex h-dvh flex-col overflow-hidden md:flex-row">
@@ -46,7 +72,7 @@ export function Shell({ children }: { children: React.ReactNode }) {
         </Link>
         <div className="nb-label px-5 pb-2 text-cream/55">Studio</div>
         <nav className="flex flex-col gap-1 px-3" aria-label="Main">
-          {NAV.map((n) => {
+          {nav.map((n) => {
             const on = n.match(path);
             return (
               <Link
@@ -60,7 +86,7 @@ export function Shell({ children }: { children: React.ReactNode }) {
               >
                 <n.icon className="size-[18px]" aria-hidden />
                 <span className="flex-1">{n.label}</span>
-                {n.href === "/queue" && count > 0 && (
+                {n.href === (mode === "pro" ? "/queue" : "/projects") && count > 0 && (
                   <span className={cn("min-w-6 rounded-full border-2 px-1.5 text-center font-mono text-[11px] font-bold leading-5", on ? "border-ink bg-ink text-accent" : "border-ink bg-accent text-ink")} aria-label={`${count} waiting for approval`}>
                     {count}
                   </span>
@@ -69,7 +95,8 @@ export function Shell({ children }: { children: React.ReactNode }) {
             );
           })}
         </nav>
-        <div className="mt-auto p-3">
+        <div className="mt-auto space-y-2 p-3">
+          <ModeSwitch />
           <div className={cn("rounded-ctl border-2 p-3 text-[12px]", alive === false ? "border-coral bg-coral/15" : "border-cream/15")}>
             <div className="flex items-center gap-2 font-semibold">
               <WorkerDot alive={alive} />
@@ -102,14 +129,14 @@ export function Shell({ children }: { children: React.ReactNode }) {
       </main>
 
       {/* Phone bottom tab bar */}
-      <nav className="on-ink fixed inset-x-0 bottom-0 z-30 grid grid-cols-4 border-t-2 border-ink bg-ink pb-[env(safe-area-inset-bottom)] md:hidden" aria-label="Main">
-        {NAV.map((n) => {
+      <nav className="on-ink fixed inset-x-0 bottom-0 z-30 grid border-t-2 border-ink bg-ink pb-[env(safe-area-inset-bottom)] md:hidden" aria-label="Main" style={{ gridTemplateColumns: `repeat(${nav.length}, minmax(0, 1fr))` }}>
+        {nav.map((n) => {
           const on = n.match(path);
           return (
             <Link key={n.href} href={n.href} aria-current={on ? "page" : undefined} className="flex h-16 flex-col items-center justify-center gap-1 text-[11px] font-semibold">
               <span className={cn("relative flex h-8 w-12 items-center justify-center rounded-full border-2 transition-colors", on ? "border-cream bg-accent text-ink" : "border-transparent text-cream/75")}>
                 <n.icon className="size-5" aria-hidden />
-                {n.href === "/queue" && count > 0 && (
+                {n.href === (mode === "pro" ? "/queue" : "/projects") && count > 0 && (
                   <span className="absolute -right-1.5 -top-1.5 min-w-5 rounded-full border-2 border-ink bg-coral px-1 text-center font-mono text-[10px] font-bold leading-4 text-ink" aria-label={`${count} waiting`}>
                     {count}
                   </span>

@@ -8,6 +8,7 @@ import { runDiscovery } from "../src/server/adapters/registry";
 import { Engine } from "../src/server/engine/engine";
 import { processPlans, requeueStalePlans } from "../src/server/director";
 import { emit } from "../src/server/events";
+import { processProductions } from "../src/server/producer";
 
 async function main() {
   getDb();
@@ -21,6 +22,8 @@ async function main() {
   console.log(`[worker] ${engine.workerId} ready (concurrency ${engine.concurrency})`);
 
   const planTimer = setInterval(() => void processPlans(), 1000);
+  // Creation-first productions advance by watching their runs and plans (durable; safe to re-run).
+  const prodTimer = setInterval(() => void processProductions().catch((e) => console.error("[worker] productions", e)), 1000);
   const beat = () =>
     getDb()
       .prepare("INSERT INTO settings (key, value_json, updated_at) VALUES ('__worker_heartbeat', ?, ?) ON CONFLICT(key) DO UPDATE SET value_json=excluded.value_json, updated_at=excluded.updated_at")
@@ -44,6 +47,7 @@ async function main() {
     stopping = true;
     console.log(`[worker] ${sig}: stopping (running jobs are cancelled and will be retried on next start)`);
     clearInterval(planTimer);
+    clearInterval(prodTimer);
     clearInterval(beatTimer);
     clearInterval(discTimer);
     clearInterval(refreshTimer);

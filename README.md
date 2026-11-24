@@ -37,6 +37,28 @@ Most "AI video" tools are a prompt box glued to a cloud bill. Orkestr is the opp
 - **AI plans, a deterministic engine executes.** The AI Director proposes a schema-validated plan; Orkestr builds
   the workflow graph itself and a durable worker runs it, with retries, caching and selective re-renders.
 
+## How it feels
+
+1. **Say what you want.** On the home screen, describe it in plain words, for example *"A 30-second commercial
+   for my café app in Egyptian Arabic, kafeeh.com"*. You can add photos, a logo or a music track, or pick a recipe.
+2. **Review the direction.** Orkestr reads your website: brand colours, headings, call to action, logo and real
+   screens. It picks a recipe and writes the storyboard, either with the AI Director or the free recipe planner.
+   Every line is editable in place. Creative checks have already fixed the timing, and they flag anything that
+   needs you, such as missing copy or a number you haven't confirmed.
+3. **Make it.** Confirm the text is accurate, choose a voice if you want one, and press **Make it**. Production
+   runs in the background with real progress. Any decision that needs you (paid voice, pronunciation, captions,
+   final cut) appears inline.
+4. **Refine and export.** Say "make it 15 seconds", "slower, more cinematic", "bigger text", "make an Instagram
+   version" or "change the call to action to …". Only what changed re-renders. Earlier versions can be restored.
+
+The flow editor, storyboard, render queue and logs are still there under **Studio Pro**, a switch in the sidebar.
+Both modes work on the same projects, engine and runs. Measurements are in
+[docs/UX_MEASUREMENTS.md](docs/UX_MEASUREMENTS.md).
+
+| Create | Direction review | Producing, with decisions inline |
+| --- | --- | --- |
+| [![Create](docs/screenshots/after-home.png)](docs/screenshots/after-home.png) | [![Direction](docs/screenshots/after-direction.png)](docs/screenshots/after-direction.png) | [![Approval](docs/screenshots/after-approval.png)](docs/screenshots/after-approval.png) |
+
 ## Quick start
 
 **Requirements:** Node **22.13+**, FFmpeg/FFprobe on `PATH`. Windows 10/11, macOS and Linux all work (the optional
@@ -68,7 +90,7 @@ logos and stills generated with FFmpeg, a test-pattern clip and a test tone. It 
 fixture (clearly labelled, *not* AI-generated) through the normal code path, so you get a real storyboard and a
 validated 14-node workflow to explore without spending anything. The screenshots below were taken with it.
 
-## Tour
+## Tour (Studio Pro)
 
 | Dashboard — the control room | AI Director — the plan as a call sheet |
 | --- | --- |
