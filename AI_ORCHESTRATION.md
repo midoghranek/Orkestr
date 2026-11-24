@@ -15,9 +15,8 @@ claude -p <prompt> --output-format json --json-schema <DirectorPlan JSON Schema>
 
 The prompt contains: the brief, the project (brand, pronunciation, language, product URL, brand notes), the
 **verified claims** (the only product facts the model may use), the library assets (id, kind, size, notes) and the
-**live capability matrix** (ready tools, and unavailable tools with reasons). System rules: no invented claims; plan
-only with ready tools; real UI only from `ui-capture`; durations add up; Egyptian Arabic pacing ≈ 2.3 words/s;
-≤3 essential questions; propose only.
+**live capability matrix** (ready tools, and unavailable tools with reasons). The system prompt is
+`DIRECTOR_SYSTEM` (see [System prompts](#system-prompts)).
 
 The response is validated twice: by the CLI against the JSON Schema and by Orkestr with Zod
 (`DirectorPlanSchema`). Invalid output fails the job (retryable). Cost and tokens come from the CLI's
@@ -49,6 +48,31 @@ nodes can only call capabilities that discovery marked ready.
 - `ai.review` — the model may *read* the frames copied into a dedicated temp dir (`--tools Read --add-dir`),
   returns `{verdict, summary, issues[]}`. Advisory only; it never approves anything.
 - All Claude calls are paid with unknown up-front price → they require approval inside workflows.
+
+## System prompts
+
+All four system prompts live in [`src/server/prompts.ts`](src/server/prompts.ts). Each one is passed as
+`--system-prompt` to a `claude -p` call whose answer is validated against a JSON Schema.
+
+| Prompt | Used by | Answer schema | What it covers |
+| --- | --- | --- | --- |
+| `DIRECTOR_SYSTEM` | AI Director plan (`director.ts`) | `DirectorPlanSchema` | How `planToGraph` reads the plan (deliverable kinds, visual sources, end card), verified claims only, pacing and reading-speed targets, questions and risks |
+| `EDIT_SYSTEM` | "Use AI Director" refinements (`producer.ts`) | `EditOpsSchema` | How operations are applied (scene numbering, automatic rebalancing), minimal changes, copy limits, verified claims only |
+| `REVIEW_SYSTEM` | `ai.review` node (`claude.ts`) | `{verdict, summary, issues[]}` | What to look for in frames, severity and verdict definitions, report only what is visible |
+| `WRITE_SYSTEM` | `ai.write` node (`claude.ts`) | `{text}` | Finished copy only, facts only from the context, language and length |
+
+The prompts share three rules:
+
+- **They explain what happens to the answer.** Most of each prompt describes how the engine renders or applies
+  the output, so a plan that follows `DIRECTOR_SYSTEM` should pass creative QA without repairs.
+- **Supplied content is data.** Website text, the current plan, upstream context and words inside frames are
+  never treated as instructions.
+- **No invented content.** Product facts come only from verified claims or the supplied context.
+
+When you change a pacing number in `creative-qa.ts` or a rule in `planToGraph`, update the matching line in
+`prompts.ts`. `tests/unit/prompts.test.ts` checks that the guardrails are present and that each prompt stays
+under `MAX_SYSTEM_PROMPT_CHARS`: the prompt travels as a command-line argument, and Windows caps a command line
+at 32,767 characters.
 
 ## Model abstraction
 

@@ -18,6 +18,7 @@ import { ClaudeAdapter, DEFAULT_MODEL } from "./adapters/claude";
 import { recordCost } from "./costs";
 import { listApprovals, type ApprovalView } from "./views";
 import { HttpError } from "./http";
+import { EDIT_SYSTEM } from "./prompts";
 
 /**
  * The production coordinator: the layer that lets a person say what they want and get a finished piece, while
@@ -501,16 +502,13 @@ export async function refine(productionId: string, input: { instruction?: string
 
 async function aiEdits(projectId: string, plan: DirectorPlan, instruction: string): Promise<{ ops: EditOp[]; summary: string }> {
   const project = getProject(projectId)!;
-  const system = `You edit a video production plan by emitting structured edit operations. You never output a full plan,
-code or commands. Scene numbers are 1-based. Keep every product statement within the verified claims; never invent numbers,
-testimonials or features. Keep on-screen text short (max ~6 words, 40 characters). Respond in the plan's language.`;
   const prompt = [
     `# Request\n${instruction}`,
     `# Current plan (JSON)\n${JSON.stringify({ title: plan.title, language: plan.language, tone: plan.tone, deliverables: plan.deliverables, cta: plan.cta, style: plan.style, scenes: plan.scenes.map((s, i) => ({ n: i + 1, role: s.role, durationS: s.durationS, onScreenText: s.onScreenText, narration: s.narration, visualSource: s.visualSource })) })}`,
     `# Verified claims\n${project.settings.verifiedClaims.map((c) => `- ${c}`).join("\n") || "- (none)"}`,
     "Return the operations and a one-sentence summary of what you changed.",
   ].join("\n\n");
-  const res = await claude.structured({ system, prompt, schema: EditOpsSchema, model: getSettings().directorModel ?? DEFAULT_MODEL, maxBudgetUsd: Math.min(1, getSettings().directorMaxUsd), timeoutMs: 5 * 60_000 });
+  const res = await claude.structured({ system: EDIT_SYSTEM, prompt, schema: EditOpsSchema, model: getSettings().directorModel ?? DEFAULT_MODEL, maxBudgetUsd: Math.min(1, getSettings().directorMaxUsd), timeoutMs: 5 * 60_000 });
   recordCost({ projectId, provider: "claude", operation: "ai.edit", kind: "actual", amountUsd: res.costUsd, known: res.costUsd !== null, tokensIn: res.tokensIn, tokensOut: res.tokensOut, note: `refine (${res.model})` });
   return { ops: res.data.ops, summary: res.data.summary };
 }

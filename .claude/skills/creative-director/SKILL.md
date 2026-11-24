@@ -31,12 +31,14 @@ Operates the Orkestr AI Director over the local HTTP API (`http://127.0.0.1:4317
 6. **Accept.** `POST /api/plans/{planId}/accept` with the options object (see Examples). Read `notes` (placeholders, missing music/VO) and `issues` (validation errors, `level: "error"` means the workflow needs fixing) and relay both honestly.
 7. **Hand off.** `GET /api/workflows/{workflowId}` shows `validation`. Do not run until the user approves cost (`cost-optimizer`).
 
-### Plan review rules (mirror `src/server/director.ts` SYSTEM prompt)
+### Plan review rules (mirror `DIRECTOR_SYSTEM` in `src/server/prompts.ts`)
 - Only verified claims; no invented features, prices, numbers, customers. Pricing marked "do not state" stays unstated.
 - Only READY tools. Generated image/video/music/SFX are unavailable here; a scene wanting them must be `brand-asset`, `ui-capture`, `motion-graphics`, or an honest `placeholder` with a matching `risks` entry.
 - Real product UI comes only from `ui-capture` scenes (Playwright of `productUrl`), never imagined screens.
 - Scene `durationS` sum equals the main (first) deliverable's `durationS` within 0.5 s.
 - Narration fits scene durations: Egyptian Arabic about 2.3 words/s (a 4 s scene holds about 9 words; a 32 s cut about 70 words).
+- Pacing: hook scene at most 2.5 s, later scenes 1.5-6 s (ui-capture up to 7 s), end card 2.5-5 s; on-screen text about 6 words, at most 40 characters a line (32 in Arabic) and 17 characters per second.
+- Any digit on screen appears in a verified claim.
 - At most 3 questions, only if essential.
 
 ### How accept builds the graph (`planToGraph`)

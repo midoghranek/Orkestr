@@ -154,9 +154,26 @@ captions and compositions support right-to-left layouts.
 - **Worker** (`worker/`) — the only process that executes nodes; durable, resumable, concurrency-limited.
 - **Engine** (`src/server/engine`) — typed node registry, graph validation, caching, retries, selective rerun.
 - **Adapters** (`src/server/adapters`) — one per tool; each declares the operations it verified at discovery time.
+- **System prompts** (`src/server/prompts.ts`) — the four prompts Orkestr sends to Claude, in one file.
 - **Remotion compositions** (`remotion/`) — Commercial, Poster, Loop and TestCard.
 
 Read more in [ARCHITECTURE.md](ARCHITECTURE.md) and [WORKFLOW_ENGINE.md](WORKFLOW_ENGINE.md).
+
+### AI prompts
+
+Orkestr calls Claude in four places. Each call has no tools (the frame reviewer can only read the frames it is
+given), must answer in a fixed JSON shape, and is capped by a budget you set.
+
+| Prompt | When it runs | What it returns |
+| --- | --- | --- |
+| `DIRECTOR_SYSTEM` | The AI Director plans a brief | A plan: script, storyboard, deliverables, questions, risks |
+| `EDIT_SYSTEM` | You refine a plan with "Use AI Director" | Edit operations, never a rewritten plan |
+| `REVIEW_SYSTEM` | An `ai.review` node inspects rendered frames | A verdict and a list of visible issues (advisory only) |
+| `WRITE_SYSTEM` | An `ai.write` node writes copy | The finished text |
+
+All four live in [`src/server/prompts.ts`](src/server/prompts.ts). They tell the model how the engine will render
+or apply its answer, limit product facts to your verified claims, and treat website text and other supplied
+content as data, never as instructions. See [AI_ORCHESTRATION.md](AI_ORCHESTRATION.md#system-prompts).
 
 ### Capability matrix
 
@@ -211,7 +228,7 @@ Tokens, type scale, elevation ladder, components, motion and accessibility rules
 | [ARCHITECTURE.md](ARCHITECTURE.md) | processes, data model, storage, events |
 | [WORKFLOW_ENGINE.md](WORKFLOW_ENGINE.md) | graph model, validation, scheduling, retries, caching, selective rerun |
 | [TOOL_ADAPTERS.md](TOOL_ADAPTERS.md) | every adapter, its verified operations and limits |
-| [AI_ORCHESTRATION.md](AI_ORCHESTRATION.md) | the AI Director, prompts, schemas and guardrails |
+| [AI_ORCHESTRATION.md](AI_ORCHESTRATION.md) | the AI Director, the four system prompts, schemas and guardrails |
 | [PRODUCTION_GUIDE.md](PRODUCTION_GUIDE.md) | producing a piece end to end with the demo project |
 | [SKILLS.md](SKILLS.md) | Claude Code skills shipped in `.claude/skills` |
 | [SECURITY.md](SECURITY.md) | threat model, local-only API, secrets |
