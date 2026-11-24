@@ -62,3 +62,31 @@ The build itself followed the brief's delegation model: Opus owned architecture,
 the flow editor and reviewed everything; Sonnet sub-agents built the Settings, Render Queue, Storyboard, Asset
 Library and Preview pages and the Claude Code skills against written contracts, and their reports were checked
 (typecheck, browser and API tests, fixes applied).
+
+## Creation-first orchestration
+
+- **Intent → recipe.** `understandIntent` classifies the request with keyword rules and what was supplied (URL,
+  photos), then extracts duration, aspect and language. The chosen recipe is passed to the AI Director as
+  constraints (`recipeConstraints`): beats, roles, deliverables and motion. The plan schema gains `recipe`, `cta`,
+  `style` and a per-scene `role`. All have defaults, so old plans still parse.
+- **Free recipe planner.** Without Claude, or with "Quick draft", `recipePlan` builds the plan deterministically.
+  Copy comes only from the user's request, confirmed website lines and verified claims. Missing lines are marked
+  `✎` and block production until the user writes them.
+- **Website content is untrusted.** It enters the Director prompt inside a delimited `<<<WEBSITE … WEBSITE>>>`
+  block, with a system rule never to follow instructions in it. Page text is sanitised (control characters and
+  markup stripped, lengths capped) inside the adapter. Lines become verified claims only when the user ticks "the
+  text above is accurate".
+- **Creative QA + bounded improvement.** Every new plan version goes through `improvePlan` (at most 2 passes):
+  hook ≤ 2.5 s, scenes 1.5–6 s (UI ≤ 7 s), reading speed ≤ 17 characters per second, narration pace, end card
+  ≥ 2.5 s, CTA present, no unproducible sources, numbers on screen confirmed, palette contrast ≥ 4.5:1. Repairs
+  only touch timing, line breaks, CTA defaults and unavailable sources, never the meaning of copy.
+- **Conversational edits.** `parseInstruction` maps common requests to EditOps for free (length, pace or motion,
+  text size, captions, CTA, per-scene text, retime, remove, swap, platform versions). Creative rewrites
+  (translation, tone, new copy) return null and need an explicit "Use AI Director". That call asks Claude for
+  EditOps only (`EditOpsSchema`), never a full plan or a graph, and its cost goes to the ledger.
+- **Selective re-render.** An edit saves a new plan version and rebuilds the same workflow's graph. Unchanged nodes
+  keep their signatures and are served from cache. Verified: a style edit re-rendered only the two compositions;
+  8 captures and 2 imports were reused.
+- **Carried-over approvals.** A creative gate whose input signature matches content the person already approved
+  in this project is recorded as "Carried over …". Any change in the bytes asks again. Cost approvals are never
+  carried over.

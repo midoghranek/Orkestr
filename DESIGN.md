@@ -78,6 +78,23 @@ Do not stack level-2 cards inside level-2 cards.
 - `toast()` / `Toaster` — ink-bordered cards with a coloured icon block; `aria-live`; dismissible.
 - `Logo` — yellow tile with three "tracks" of different length: parallel jobs being conducted.
 
+## Simple mode and Studio Pro
+
+The design system was re-evaluated for a creation-first product. The Call Sheet identity is kept (paper, ink,
+one yellow accent, hard shadows) because it is distinctive and accessible. It is applied with less density:
+
+- **Simple mode (default).** The sidebar has three items: Create, Projects and Setup.
+  - The home screen is a single, large creation input with recipe cards and "Continue working" thumbnails. It has
+    no KPI tiles.
+  - The project page is a two-column workspace. The main column holds whichever step is active: direction, then
+    producing, then result. The side column holds Refine, versions and spending.
+  - Most surfaces use elevation 1 (flat, softer `ink/15` borders). Hard shadows are reserved for the active step
+    and for decisions.
+- **Studio Pro.** A switch in the sidebar, stored per browser, reveals the Control room (the old dashboard, now at
+  `/studio`), the Render queue and the project tabs: Overview, AI Director, Storyboard, Flows, Assets and Preview.
+- **Microcopy.** It describes outcomes ("Capturing your product", "Waiting for your OK"), never engine nouns.
+- **Errors.** One sentence and one action, with technical details in a disclosure.
+
 ## Layout
 
 - **Shell:** ≥md an ink rail (240px) with the active item as a yellow sticker and a worker-status block; <md an ink

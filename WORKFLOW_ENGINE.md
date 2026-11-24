@@ -34,7 +34,7 @@ Node: the same plus `pending` (waiting on upstream) and `skipped` (upstream fail
      all its edges are inactive, or if a required input only has inactive edges (failure always propagates; a node
      never runs with silently missing upstream work);
    - built-in `logic.condition` evaluates `path op value` on JSON input (no code) and marks the other branch inactive;
-   - `logic.approval` creates a *creative* approval and waits;
+   - `logic.approval` creates a *creative* approval and waits (or records a *carried-over* approval when the person already approved byte-identical input for the same gate in this project);
    - otherwise the **input signature** is computed:
      `sha256(engineVersion, node type, params, input asset sha256s / value hashes, composition source hash)`;
      a completed node in the same project with the same signature whose output files still exist is **reused**
@@ -76,7 +76,7 @@ pending/queued/waiting nodes cancelled, and cancels pending approvals.
 | Family | Nodes |
 | --- | --- |
 | AI | `ai.director`, `ai.write`, `ai.review` |
-| Image | `image.capture`, `image.grade`, `image.rasterize`, `image.poster`; unavailable: `image.generate`, `image.edit`, `image.upscale` |
+| Image | `web.inspect` (brand facts + hero + logo), `image.capture`, `image.grade`, `image.rasterize`, `image.poster`; unavailable: `image.generate`, `image.edit`, `image.upscale` |
 | Video | `video.capture`, `video.still`, `video.vfx`, `video.loop`; unavailable: `video.generate`, `video.image_to_video` |
 | Audio | `audio.voiceover` (paid), `audio.tts_local`, `audio.normalize`, `audio.transcribe`, `production.mix`; unavailable: `audio.music`, `audio.sfx` |
 | Production | `production.import`, `production.compose`, `production.loop`, `production.concat`, `video.encode`, `production.subtitles`, `production.poster_frame`, `production.qa`, `production.export` |

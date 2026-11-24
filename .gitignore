@@ -11,3 +11,6 @@ test-results/
 playwright-report/
 remotion/.cache/
 .DS_Store
+
+# Playwright MCP scratch (screenshots, snapshots)
+.playwright-mcp/

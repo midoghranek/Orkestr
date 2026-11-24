@@ -114,8 +114,20 @@ export const SceneSchema = z.object({
     .enum(["brand-asset", "ui-capture", "motion-graphics", "generated-image", "generated-video", "stock", "placeholder"])
     .default("motion-graphics"),
   tool: z.string().max(80).default(""),
+  /** Story beat this scene plays (from the recipe). Drives layout choice and creative QA. */
+  role: z.enum(["hook", "problem", "ui", "benefit", "proof", "statement", "cta"]).optional(),
 });
 export type Scene = z.infer<typeof SceneSchema>;
+export const SCENE_ROLES = ["hook", "problem", "ui", "benefit", "proof", "statement", "cta"] as const;
+export type SceneRole = (typeof SCENE_ROLES)[number];
+
+/** Look & feel knobs the user can change in plain language ("slower", "bigger text", "more cinematic"). */
+export const PlanStyleSchema = z.object({
+  motion: z.enum(["calm", "standard", "energetic"]).default("standard"),
+  textScale: z.number().min(0.7).max(1.6).default(1),
+  captions: z.boolean().default(true),
+});
+export type PlanStyle = z.infer<typeof PlanStyleSchema>;
 
 /** The AI Director's structured plan. The model only proposes; Orkestr validates and builds the graph itself. */
 export const DirectorPlanSchema = z.object({
@@ -144,5 +156,33 @@ export const DirectorPlanSchema = z.object({
   music: z.string().max(400).default(""),
   questions: z.array(z.string().max(400)).max(5).default([]),
   risks: z.array(z.string().max(400)).max(10).default([]),
+  /** Recipe the plan follows (see src/server/recipes.ts). Empty for free-form plans. */
+  recipe: z.string().max(40).default(""),
+  /** Call to action shown on the end card. */
+  cta: z.object({ text: z.string().max(60).default(""), url: z.string().max(120).default("") }).default({ text: "", url: "" }),
+  style: PlanStyleSchema.default({ motion: "standard", textScale: 1, captions: true }),
 });
 export type DirectorPlan = z.infer<typeof DirectorPlanSchema>;
+
+/**
+ * Structured edits to a plan. Natural-language refinements ("slower", "change the CTA", "make an Instagram
+ * version") are translated into these — by a deterministic parser or by the AI — and applied by a pure function.
+ * Scene numbers are 1-based, as people say them.
+ */
+export const EditOpSchema = z.discriminatedUnion("op", [
+  z.object({ op: z.literal("setSceneText"), scene: z.number().int().min(1).max(40), field: z.enum(["onScreenText", "narration", "title"]), value: z.string().max(2000) }),
+  z.object({ op: z.literal("retime"), scene: z.number().int().min(1).max(40), durationS: z.number().min(0.8).max(60) }),
+  z.object({ op: z.literal("setTotalDuration"), deliverable: z.number().int().min(1).max(8).default(1), durationS: z.number().min(3).max(600) }),
+  z.object({ op: z.literal("reorderScenes"), order: z.array(z.number().int().min(1).max(40)).min(1).max(40) }),
+  z.object({ op: z.literal("removeScene"), scene: z.number().int().min(1).max(40) }),
+  z.object({ op: z.literal("addScene"), after: z.number().int().min(0).max(40), scene: SceneSchema }),
+  z.object({ op: z.literal("setLayout"), scene: z.number().int().min(1).max(40), visualSource: SceneSchema.shape.visualSource, role: z.enum(SCENE_ROLES).optional() }),
+  z.object({ op: z.literal("setCta"), text: z.string().max(60).optional(), url: z.string().max(120).optional() }),
+  z.object({ op: z.literal("setStyle"), motion: z.enum(["calm", "standard", "energetic"]).optional(), textScale: z.number().min(0.7).max(1.6).optional(), captions: z.boolean().optional() }),
+  z.object({ op: z.literal("setTone"), tone: z.string().max(200) }),
+  z.object({ op: z.literal("addDeliverable"), name: z.string().max(120), aspect: z.enum(ASPECTS), durationS: z.number().min(1).max(600) }),
+  z.object({ op: z.literal("removeDeliverable"), name: z.string().max(120) }),
+  z.object({ op: z.literal("setVoiceover"), needed: z.boolean(), direction: z.string().max(600).optional() }),
+]);
+export type EditOp = z.infer<typeof EditOpSchema>;
+export const EditOpsSchema = z.object({ ops: z.array(EditOpSchema).max(20), summary: z.string().max(400).default("") });

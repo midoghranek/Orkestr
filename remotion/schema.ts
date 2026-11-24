@@ -29,7 +29,7 @@ export const VisualSchema = z.object({
 });
 export type Visual = z.infer<typeof VisualSchema>;
 
-export const SceneLayoutSchema = z.enum(["full-bleed", "split", "title", "ui-showcase", "end-card"]);
+export const SceneLayoutSchema = z.enum(["full-bleed", "split", "title", "ui-showcase", "end-card", "statement"]);
 
 export const CommercialSceneSchema = z.object({
   id: z.string(),
@@ -39,7 +39,11 @@ export const CommercialSceneSchema = z.object({
   kicker: z.string().default(""),
   headline: z.string().default(""),
   body: z.string().default(""),
-  transition: z.enum(["fade", "slide", "none"]).default("fade"),
+  transition: z.enum(["fade", "slide", "wipe", "push", "none"]).default("fade"),
+  /** End card: call-to-action pill text. */
+  cta: z.string().default(""),
+  /** End card: URL line under the CTA. */
+  url: z.string().default(""),
   /** Marks a scene whose visual is a stand-in for footage that still has to be produced. */
   placeholder: z.boolean().default(false),
 });
@@ -63,6 +67,10 @@ export const CommercialPropsSchema = z.object({
   showCaptions: z.boolean().default(true),
   /** Burned-in banner when any visual is a placeholder: honesty about unfinished footage. */
   draftBanner: z.string().default(""),
+  /** Multiplies every type size (0.7-1.6). */
+  textScale: z.number().min(0.7).max(1.6).default(1),
+  /** Pacing: cross-fade length, spring stiffness and Ken Burns amount. */
+  motion: z.enum(["calm", "standard", "energetic"]).default("standard"),
 });
 export type CommercialProps = z.infer<typeof CommercialPropsSchema>;
 
@@ -77,6 +85,7 @@ export const PosterPropsSchema = z.object({
   sub: z.string().default(""),
   cta: z.string().default(""),
   logo: z.string().nullable().default(null),
+  textScale: z.number().min(0.7).max(1.6).default(1),
 });
 export type PosterProps = z.infer<typeof PosterPropsSchema>;
 

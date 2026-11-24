@@ -36,7 +36,11 @@
 | --- | --- |
 | `db/` | connection, pragmas, migrations |
 | `projects.ts` | projects, workflows (optimistic versioning), storyboard scenes |
-| `director.ts` | AI Director prompt, plan jobs, deterministic plan → graph builder |
+| `director.ts` | AI Director prompt, plan jobs and versions, deterministic plan → graph builder |
+| `producer.ts` | **Production coordinator** for the creation-first journey: research → plan → direction → produce → review, refinement, restore, recovery, the workspace read model and readiness. Builds validated graphs and creates runs; it never executes tools |
+| `recipes.ts` | Smart recipes (story beats, deliverables, fallbacks), the intent classifier and the free deterministic planner |
+| `creative-qa.ts` | Deterministic creative checks on plans (hook, pacing, reading speed, end card, unconfirmed numbers, contrast) and bounded auto-repair |
+| `edits.ts` | The EditOp vocabulary: a natural-language parser plus a pure `applyEdits` |
 | `engine/validate.ts` | graph schema, port typing, cycles, required inputs, capability availability |
 | `engine/node-types.ts` | every node type: ports, Zod params, capability, executor |
 | `engine/engine.ts` | runs, scheduling, cache, approvals, retries, recovery, cancellation, lineage |
@@ -52,9 +56,30 @@
 with the production nodes. `templates/` holds editable workflow templates. `.claude/skills/` holds the Claude Code
 skills that let an agent operate the studio.
 
+## Creation-first layer
+
+```
+ "What do you want to create?" ──POST /api/create──► producer.startCreation
+        │  (worker tick: processProductions, every 1 s, idempotent)
+        ▼
+ researching ─ web.inspect run (Playwright: brand, colours, headings, CTA, logo, hero)
+        ▼
+ planning ─── AI Director plan job (recipe constraints)  │ or recipe planner (free, instant)
+        ▼          └─ improvePlan(): creative QA + bounded repair → new plan version
+ direction ── user edits lines inline, confirms facts and website rights, picks a voice
+        ▼  POST /api/productions/:id/produce → autoBuildOptions (asset roles) → planToGraph → createRun
+ producing ── same engine, real stage progress, approvals inline
+        ▼
+ done ─────── refine (EditOps → new version → same workflow → cache reuse) · restore · recover
+```
+
+Productions live in the `productions` table (migration v2, additive). Plans are versioned: `parent_plan_id` plus a
+`source` of ai, recipe, qa, edit or restore. Asset **roles** (`metadata.role`, or inferred by `assetRole`) replace
+manual picking of the visual pool, logo, music and voice.
+
 ## Data model
 
-`projects` · `workflows` (graph JSON + version) · `runs` (graph snapshot, budget, status) · `node_runs` (status,
+`productions` · `projects` · `workflows` (graph JSON + version) · `runs` (graph snapshot, budget, status) · `node_runs` (status,
 attempt, signature, outputs, estimate, cost, heartbeat) · `assets` (sha256, media facts, parents, provenance,
 scene, version) · `approvals` (cost/creative) · `cost_ledger` · `scenes` · `plans` · `events` · `settings` ·
 `credentials` · `tool_registry`.

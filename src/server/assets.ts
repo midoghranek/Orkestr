@@ -53,13 +53,33 @@ interface AssetRow {
   created_at: number;
 }
 
+/**
+ * Asset rows store absolute paths. When the data directory moved (another checkout, ORKESTR_DATA_DIR, a restored
+ * backup) those paths point at the old location. Store layout is fixed (`assets/<project>/<xx>/<sha>.<ext>`), so the
+ * file is re-located under the current asset store. Only paths that resolve *inside* the store are accepted.
+ */
+export function relocateAssetPath(stored: string): string {
+  const base = assetsDir();
+  const rel = path.relative(base, stored);
+  if (!rel.startsWith("..") && !path.isAbsolute(rel)) return stored;
+  const parts = stored.split(/[\\/]+/);
+  const i = parts.lastIndexOf("assets");
+  if (i < 0 || i === parts.length - 1) return stored;
+  try {
+    const candidate = resolveInside(base, parts.slice(i + 1).join("/"));
+    return fs.existsSync(candidate) ? candidate : stored;
+  } catch {
+    return stored;
+  }
+}
+
 function fromRow(r: AssetRow): Asset {
   return {
     id: r.id,
     projectId: r.project_id,
     kind: r.kind,
     label: r.label,
-    path: r.path,
+    path: relocateAssetPath(r.path),
     mime: r.mime,
     size: r.size,
     sha256: r.sha256,
@@ -205,6 +225,42 @@ export function listAssets(projectId: string, filter: { kind?: string; sceneId?:
   }
   args.push(filter.limit ?? 500);
   return (getDb().prepare(`SELECT * FROM assets WHERE ${where.join(" AND ")} ORDER BY created_at DESC LIMIT ?`).all(...args) as unknown as AssetRow[]).map(fromRow);
+}
+
+export const ASSET_ROLES = ["logo", "logo-reversed", "photo", "ui", "music", "voiceover", "other"] as const;
+export type AssetRole = (typeof ASSET_ROLES)[number] | "output";
+
+/**
+ * What an asset is *for*. An explicit `metadata.role` wins; otherwise it is inferred from how the asset got here
+ * and its name, so planning never has to ask "which of these is the logo?".
+ */
+export function assetRole(a: Asset | undefined): AssetRole | undefined {
+  if (!a) return undefined;
+  const explicit = a.metadata.role;
+  if (typeof explicit === "string" && (ASSET_ROLES as readonly string[]).includes(explicit)) return explicit as AssetRole;
+  const name = `${a.label} ${String(a.provenance.originalName ?? "")}`.toLowerCase();
+  if (a.nodeRunId) return a.kind === "image" && /ui capture/i.test(a.label) ? "ui" : "output";
+  if (a.kind === "image") {
+    if (/logo|wordmark|logomark|brand ?mark|\bmark\b|\bicon\b/.test(name) || a.mime === "image/svg+xml") return /white|reverse|inverse|dark[-_ ]?bg|on[-_ ]?dark|light[-_ ]?version/.test(name) ? "logo-reversed" : "logo";
+    return "photo";
+  }
+  if (a.kind === "video") return "photo";
+  if (a.kind === "audio") {
+    if (/voice|vo\b|narrat|take/.test(name)) return "voiceover";
+    if (/music|track|song|beat|bed|loop/.test(name)) return "music";
+    return "other";
+  }
+  return "other";
+}
+
+export function setAssetRole(id: string, role: (typeof ASSET_ROLES)[number] | null): Asset {
+  const a = getAsset(id);
+  if (!a) throw new Error("asset not found");
+  const metadata = { ...a.metadata };
+  if (role) metadata.role = role;
+  else delete metadata.role;
+  getDb().prepare("UPDATE assets SET metadata_json = ? WHERE id = ?").run(JSON.stringify(metadata), id);
+  return getAsset(id)!;
 }
 
 export function assetExists(a: Asset): boolean {

@@ -1,5 +1,6 @@
 import React from "react";
 import { AbsoluteFill, Img, interpolate, useCurrentFrame, useVideoConfig } from "remotion";
+import { alpha } from "../color";
 import type { LoopProps } from "../schema";
 
 /**
@@ -30,7 +31,7 @@ export const Loop: React.FC<LoopProps> = (p) => {
     <AbsoluteFill style={{ background: p.palette.surface }}>
       {layer(k, 1)}
       {n > 1 && mix > 0 && layer((k + 1) % n, mix)}
-      {p.scrim > 0 && <AbsoluteFill style={{ background: `rgba(26,51,36,${p.scrim})` }} />}
+      {p.scrim > 0 && <AbsoluteFill style={{ background: `${alpha(p.palette.surface, p.scrim)}` }} />}
       {p.logo && <Img src={p.logo} style={{ position: "absolute", bottom: 5 * u, insetInlineEnd: 5 * u, height: 5 * u, opacity: 0.85 }} />}
     </AbsoluteFill>
   );

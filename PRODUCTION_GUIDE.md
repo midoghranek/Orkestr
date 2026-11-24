@@ -1,6 +1,19 @@
 # Production guide
 
-## Pipeline
+## The simple way (default)
+
+1. On **Create**, describe what you want. Add your website, photos, a logo or music if you have them (logos are
+   recognised by name, e.g. `logo.svg`, `logo-white.png`), or pick a recipe.
+2. Review the **creative direction**:
+   - Edit any line in place. Answer the director's questions in **Refine**.
+   - Confirm the text is accurate, and confirm that the website is yours if its screens or logo are used.
+   - Choose a voice: none, your recording, or AI voice (paid, approved first).
+3. Press **Make it**. Watch the real progress. Decisions such as the final cut appear inline.
+4. **Refine** in plain words, restore earlier versions, and download each format once it is approved.
+
+Recipes: Product commercial, Social reel, Announcement, Narrated explainer, Homepage hero loop, Promotional poster.
+
+## Pipeline (Studio Pro)
 
 `Brief → Script → Storyboard → References → Scene visuals → Animation/VFX → Voiceover + sound → Composition →
 Subtitles → Render → QA → Approval → Export`

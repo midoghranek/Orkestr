@@ -151,6 +151,18 @@ const captureNode: NodeDef<{ url: string; width: number; height: number; deviceS
   run: ({ params, call }) => call("playwright.screenshot", params),
 };
 
+const inspectNode: NodeDef<{ url: string; width: number; height: number; locale: string }> = {
+  type: "web.inspect",
+  family: "image",
+  label: "Inspect Website Brand",
+  description: "Read a live website's brand: name, description, headings, calls to action, colours and logo, plus a hero capture. Page text is untrusted data for the user to confirm.",
+  inputs: [],
+  outputs: [port("brand", "json"), port("hero", "image"), port("logo", "image", { optional: true })],
+  params: z.object({ url: z.string().url(), width: z.number().int().min(320).max(3840).default(1280), height: z.number().int().min(320).max(3840).default(800), locale: z.string().max(20).default("en-US") }),
+  capability: "playwright.inspect",
+  run: ({ params, call }) => call("playwright.inspect", { ...params, deviceScaleFactor: 2, waitMs: 1200 }),
+};
+
 const gradeNode: NodeDef<{ width?: number; warming: number; vibrance: number; saturation: number; sharpen: boolean; format: "png" | "jpg" | "webp" }> = {
   type: "image.grade",
   family: "image",
@@ -375,21 +387,28 @@ const composeParams = z.object({
       z.object({
         id: z.string().optional(),
         durationS: z.number().min(0.3).max(120).optional(),
-        layout: z.enum(["full-bleed", "split", "title", "ui-showcase", "end-card"]).optional(),
+        layout: z.enum(["full-bleed", "split", "title", "statement", "ui-showcase", "end-card"]).optional(),
         /** null = no visual (title card); omit to use the wired visual at visualIndex. */
         visual: z.object({ fit: z.enum(["cover", "contain"]).optional(), kenBurns: z.boolean().optional(), frame: z.enum(["none", "browser", "phone"]).optional(), scroll: z.boolean().optional(), startFromS: z.number().min(0).optional() }).nullable().optional(),
         visualIndex: z.number().int().min(0).optional(),
         kicker: z.string().max(200).optional(),
         headline: z.string().max(400).optional(),
         body: z.string().max(600).optional(),
-        transition: z.enum(["fade", "slide", "none"]).optional(),
+        transition: z.enum(["fade", "slide", "wipe", "push", "none"]).optional(),
         placeholder: z.boolean().optional(),
+        /** End card only: call to action and URL. */
+        cta: z.string().max(60).optional(),
+        url: z.string().max(120).optional(),
       }),
     )
     .default([]),
   voiceoverDelayS: z.number().min(0).max(10).default(0.4),
   musicVolume: z.number().min(0).max(1).default(0.22),
   showCaptions: z.boolean().default(true),
+  /** Look & feel: transition length, spring feel, Ken Burns amount. */
+  motion: z.enum(["calm", "standard", "energetic"]).default("standard"),
+  /** Multiplies every type size ("make the text easier to read"). */
+  textScale: z.number().min(0.7).max(1.6).default(1),
   draftBanner: z.string().max(120).default(""),
   maxDurationS: z.number().min(1).max(600).optional(),
 });
@@ -430,6 +449,8 @@ const composeNode: NodeDef<z.infer<typeof composeParams>> = {
         headline: o.headline ?? ps?.onScreenText ?? "",
         body: o.body ?? "",
         transition: o.transition ?? "fade",
+        ...(o.cta !== undefined ? { cta: o.cta } : {}),
+        ...(o.url !== undefined ? { url: o.url } : {}),
         // A placeholder asset always marks the scene, whatever the plan assumed about its source.
         placeholder: o.placeholder === true || v?.meta?.placeholder === true,
       });
@@ -458,6 +479,8 @@ const composeNode: NodeDef<z.infer<typeof composeParams>> = {
       musicVolume: params.musicVolume,
       captions,
       showCaptions: params.showCaptions,
+      motion: params.motion,
+      textScale: params.textScale,
       draftBanner: params.draftBanner || (scenes.some((s) => s.placeholder) ? "DRAFT · placeholder visuals" : ""),
     });
     return call("remotion.render", { composition: "Commercial", props });
@@ -681,6 +704,7 @@ export const NODE_DEFS: NodeDef<any>[] = [
   writeNode,
   reviewNode,
   captureNode,
+  inspectNode,
   gradeNode,
   rasterizeNode,
   posterNode,

@@ -378,11 +378,18 @@ export class Engine {
 
         if (def.builtin === "approval") {
           const p = params as { title: string; instructions: string };
+          // A person already approved exactly this content (same gate, same input bytes) in this project — e.g. the
+          // captions after a text-only edit. Re-asking would only add friction; record the carried-over decision.
+          const prior = db
+            .prepare(
+              "SELECT a.id FROM approvals a JOIN node_runs n ON n.id = a.node_run_id JOIN runs r ON r.id = n.run_id WHERE a.kind = 'creative' AND a.status = 'approved' AND n.signature = ? AND r.project_id = ? AND COALESCE(a.decided_note, '') NOT LIKE 'Carried over%' LIMIT 1",
+            )
+            .get(signature, run.project_id) as { id: string } | undefined;
           db.prepare(
-            "INSERT INTO approvals (id, project_id, run_id, node_run_id, kind, status, title, detail, requested_at) VALUES (?, ?, ?, ?, 'creative', 'pending', ?, ?, ?)",
-          ).run(newId("apv"), run.project_id, run.id, nr.id, p.title, p.instructions, Date.now());
+            "INSERT INTO approvals (id, project_id, run_id, node_run_id, kind, status, title, detail, decided_note, requested_at, decided_at) VALUES (?, ?, ?, ?, 'creative', ?, ?, ?, ?, ?, ?)",
+          ).run(newId("apv"), run.project_id, run.id, nr.id, prior ? "approved" : "pending", p.title, p.instructions, prior ? `Carried over: you approved identical content earlier (${prior.id})` : null, Date.now(), prior ? Date.now() : null);
           db.prepare("UPDATE node_runs SET status='waiting_approval', signature=? WHERE id=?").run(signature, nr.id);
-          emit({ type: "approval.requested", message: `${nodeId}: waiting for creative approval — ${p.title}`, runId: run.id, nodeRunId: nr.id, projectId: run.project_id });
+          emit({ type: prior ? "approval.carried_over" : "approval.requested", message: prior ? `${nodeId}: identical content was already approved — carried over` : `${nodeId}: waiting for creative approval — ${p.title}`, runId: run.id, nodeRunId: nr.id, projectId: run.project_id });
           changed = true;
           continue;
         }
