@@ -20,7 +20,7 @@
 ---
 
 <p align="center">
-  <img src="docs/media/tour.gif" alt="A walkthrough: dashboard, projects, the AI Director call sheet, storyboard, assets, preview and the render queue" width="100%">
+  <img src="docs/media/tour.gif" alt="A walkthrough: describe a video on the Create screen, approve the cut inline, then switch on Studio Pro for the control room, AI Director call sheet, storyboard, assets, preview, render queue and setup" width="100%">
 </p>
 
 ## Why Orkestr
@@ -88,11 +88,12 @@ For an optimized local build: `npm run build && npm run start`.
 `npm run seed:demo` creates **Acme Café (demo)** — a fictional brand with dummy data only: invented "demo claims",
 logos and stills generated with FFmpeg, a test-pattern clip and a test tone. It also accepts a hand-written plan
 fixture (clearly labelled, *not* AI-generated) through the normal code path, so you get a real storyboard and a
-validated 14-node workflow to explore without spending anything. The screenshots below were taken with it.
+validated 14-node workflow to explore without spending anything. The screenshots below were taken with it; the
+"How it feels" shots use a fictional *Acme Roastery* reel built from the demo photos with the free recipe planner.
 
 ## Tour (Studio Pro)
 
-| Dashboard — the control room | AI Director — the plan as a call sheet |
+| Control room — studio status and decisions | AI Director — the plan as a call sheet |
 | --- | --- |
 | [![Dashboard](docs/screenshots/dashboard.png)](docs/screenshots/dashboard.png) | [![AI Director](docs/screenshots/director.png)](docs/screenshots/director.png) |
 | **Storyboard** — scenes, narration, approvals | **Flow editor** — typed DAG with live validation |
